@@ -30,19 +30,29 @@ async function fetchData() {
         renderProjects(projects);
 
         // Cargar bots
-        // Si estamos en el MSI, pedimos los bots al OMEN directamente
-        let bots = [];
+        let localBots = [];
         try {
-            const botsUrl = config.pcName === 'MSI' 
-                ? `http://${config.remoteServerIp}:4000/api/bots` 
-                : '/api/bots';
+            const localRes = await fetch('/api/bots');
+            localBots = await localRes.json();
+        } catch (e) { console.error("Error cargando bots locales", e); }
+
+        let finalBots = [...localBots];
+
+        // Si estamos en el MSI, traemos también los bots de WhatsApp del OMEN
+        if (config.pcName === 'MSI') {
+            try {
+                const remoteRes = await fetch(`http://${config.remoteServerIp}:4000/api/bots`);
+                const remoteBots = await remoteRes.json();
                 
-            const botsRes = await fetch(botsUrl);
-            bots = await botsRes.json();
-        } catch (e) {
-            console.warn('No se pudieron cargar los bots del servidor remoto', e);
+                // Filtramos para traer solo los bots de WhatsApp del remoto
+                const whatsappBots = remoteBots.filter(b => b.name.includes('whatsapp'));
+                finalBots = [...finalBots, ...whatsappBots];
+            } catch (e) {
+                console.warn('No se pudieron cargar los bots remotos del OMEN', e);
+            }
         }
-        renderBots(bots);
+        
+        renderBots(finalBots);
         
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -141,17 +151,20 @@ function renderBots(bots) {
     bots.forEach(b => {
         const isOnline = b.status === 'online';
         const statusClass = isOnline ? 'status-online' : 'status-offline';
+        const isWhatsApp = b.name.includes('whatsapp');
+        const icon = isWhatsApp ? 'fa-brands fa-whatsapp' : 'fa-solid fa-robot';
+        const iconColor = isWhatsApp ? '#25D366' : 'var(--accent)';
 
         const card = document.createElement('div');
         card.className = 'card';
-        if (b.name.includes('whatsapp')) {
+        if (isWhatsApp) {
             card.style.cursor = 'pointer';
             card.onclick = () => window.showBotLogs(b.name);
         }
 
         card.innerHTML = `
             <div class="card-header">
-                <i class="fa-brands fa-whatsapp card-icon" style="color: #25D366"></i>
+                <i class="${icon} card-icon" style="color: ${iconColor}"></i>
                 <div class="card-title">${b.name}</div>
             </div>
             <div class="card-body">
