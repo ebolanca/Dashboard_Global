@@ -104,6 +104,9 @@ function renderProjects(projects) {
 
         const card = document.createElement('div');
         card.className = 'card';
+        card.style.cursor = 'pointer';
+        card.onclick = () => window.openUrl(null, p.url);
+
         card.innerHTML = `
             <div class="card-header">
                 <i class="fa-solid ${icon} card-icon"></i>
@@ -128,10 +131,10 @@ function renderProjects(projects) {
                     </span>
                 </div>
                 <div class="card-actions">
-                    <button class="btn-action" onclick="window.openUrl('${p.githubUrl}')" title="GitHub">
+                    <button class="btn-action" onclick="window.openUrl(event, '${p.githubUrl}')" title="GitHub">
                         <i class="fa-brands fa-github"></i>
                     </button>
-                    <button class="btn-action" onclick="window.openUrl('${p.consoleUrl}')" title="Firebase">
+                    <button class="btn-action" onclick="window.openUrl(event, '${p.consoleUrl}')" title="Firebase">
                         <i class="fa-solid fa-cloud"></i>
                     </button>
                     ${actionBtn}
@@ -192,7 +195,10 @@ function renderBots(bots) {
     });
 }
 
-window.openUrl = (url) => window.open(url, '_blank');
+window.openUrl = (e, url) => {
+    if (e) e.stopPropagation();
+    window.open(url, '_blank');
+};
 
 window.pullProject = async function(event, name) {
     if (event) {

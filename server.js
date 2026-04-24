@@ -147,7 +147,7 @@ app.get('/api/projects', async (req, res) => {
                         const urlsMap = {
                             'Horarios': 'https://horarios-rail.web.app',
                             'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
-                            'Vacaciones': 'https://vacaciones.web.app'
+                            'Vacaciones': 'https://viajes-en-caravana.web.app/'
                         };
 
                         projects.push({
