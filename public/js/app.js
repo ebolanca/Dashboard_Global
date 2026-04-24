@@ -195,14 +195,19 @@ function renderBots(bots) {
 window.openUrl = (url) => window.open(url, '_blank');
 
 window.pullProject = async function(event, name) {
-    if (event) event.stopPropagation();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     
     const badge = event ? event.currentTarget : null;
     let originalHtml = '';
+    
     if (badge) {
         originalHtml = badge.innerHTML;
         badge.innerHTML = '<div class="spinner" style="width:14px; height:14px; border-width:2px;"></div> <span style="margin-left:8px">Actualizando...</span>';
         badge.style.pointerEvents = 'none';
+        badge.classList.add('syncing');
     }
 
     try {
@@ -211,31 +216,33 @@ window.pullProject = async function(event, name) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name })
         });
-        if (res.ok) {
-            fetchData();
-        } else {
-            alert('Error al actualizar ' + name);
-            if (badge) {
-                badge.innerHTML = originalHtml;
-                badge.style.pointerEvents = 'auto';
-            }
+        
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.details || 'Error desconocido');
         }
+        
+        await fetchData();
     } catch (e) {
-        console.error(e);
+        console.error(`Error en pull de ${name}:`, e);
+        alert(`Fallo al actualizar ${name}: ${e.message}`);
         if (badge) {
             badge.innerHTML = originalHtml;
             badge.style.pointerEvents = 'auto';
+            badge.classList.remove('syncing');
         }
     }
 };
 
 window.syncAllProjects = async function() {
     const btn = document.getElementById('btn-sync-all');
+    if (!btn) return;
+
     const originalContent = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
     btn.disabled = true;
 
-    const pullables = document.querySelectorAll('.status-badge.pullable');
+    const pullables = Array.from(document.querySelectorAll('.status-badge.pullable'));
     if (pullables.length === 0) {
         alert("Todos los proyectos están al día.");
         btn.innerHTML = originalContent;
@@ -243,15 +250,25 @@ window.syncAllProjects = async function() {
         return;
     }
 
-    // Ejecutamos en serie para evitar bloqueos de git
+    // Procesar uno por uno para evitar conflictos de git lock
     for (const badge of pullables) {
-        const name = badge.closest('.card').querySelector('.card-title').innerText.split('\n')[0].trim();
-        await window.pullProject(null, name);
+        const card = badge.closest('.card');
+        if (!card) continue;
+        const nameDisplay = card.querySelector('.card-title');
+        const name = nameDisplay ? nameDisplay.innerText.split('\n')[0].trim() : '';
+        
+        if (name) {
+            try {
+                await window.pullProject(null, name);
+            } catch (err) {
+                console.error(`Error sincronizando ${name}`, err);
+            }
+        }
     }
 
     btn.innerHTML = originalContent;
     btn.disabled = false;
-    fetchData();
+    await fetchData();
 };
 
 window.showBotLogs = async (name) => {
