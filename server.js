@@ -175,14 +175,78 @@ app.post('/api/projects/pull', async (req, res) => {
         const { name } = req.body;
         if (!name) return res.status(400).json({ error: 'Project name is required' });
         
-        const projectPath = path.join(WORKSPACE_DIR, name);
-        if (!fs.existsSync(projectPath)) return res.status(404).json({ error: 'Project not found' });
+        // Limpiar nombre (ej: "Alquileres (Garlopan)" -> "Alquileres")
+        const folderName = name.replace(/ \(.*?\)$/, '');
+        const projectPath = path.join(WORKSPACE_DIR, folderName);
+        
+        if (!fs.existsSync(projectPath)) return res.status(404).json({ error: `Project folder not found: ${folderName}` });
         
         const git = simpleGit(projectPath);
         const pullResult = await git.pull();
         res.json({ success: true, details: pullResult });
     } catch (e) {
         res.status(500).json({ error: 'Pull failed', details: e.message });
+    }
+});
+
+app.post('/api/projects/deploy', async (req, res) => {
+    try {
+        const { name, version, summary } = req.body;
+        if (!name || !version || !summary) {
+            return res.status(400).json({ error: 'Missing data' });
+        }
+
+        const folderName = name.replace(/ \(.*?\)$/, '');
+        const targetPath = path.join(WORKSPACE_DIR, folderName);
+        
+        const config = {
+            'Horarios': { project: 'horarios-rail', site: 'hosting:app' },
+            'Pedidos': { project: 'alquiler-pisos-23550', site: 'hosting:pedidos-rail-app-2025-87f2c' } 
+        };
+
+        const projectConfig = config[folderName];
+        const { execSync } = require('child_process');
+        
+        console.log(`🚀 Iniciando proceso para ${folderName} v${version}`);
+        
+        // 1. Sincronizar versión (si el script existe)
+        if (fs.existsSync(path.join(targetPath, 'scripts/sync_version.js'))) {
+            execSync(`node scripts/sync_version.js ${version}`, { cwd: targetPath });
+        }
+        
+        // 2. Desplegar en Firebase (solo si está configurado)
+        if (projectConfig) {
+            console.log(`📡 Desplegando en Firebase: ${projectConfig.site}`);
+            
+            let token = "";
+            try {
+                const secretConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+                token = secretConfig.firebaseToken;
+            } catch (e) {
+                console.error("Error leyendo token de config.json", e);
+            }
+
+            const deployCmd = `npx.cmd -y firebase-tools deploy --only ${projectConfig.site} --project ${projectConfig.project} --token "${token}"`;
+            execSync(deployCmd, { cwd: targetPath });
+        } else {
+            console.log(`ℹ️ Proyecto sin Firebase configurado. Saltando a Git Push.`);
+        }
+        
+        // 3. Git Push con el formato del usuario: "vX.XX: Resumen"
+        const commitMsg = `v${version.replace('v', '')}: ${summary}`;
+        if (fs.existsSync(path.join(targetPath, 'scripts/git_push.js'))) {
+            execSync(`node scripts/git_push.js "${commitMsg}"`, { cwd: targetPath });
+        } else {
+            // Backup por si no hay script: commit directo
+            execSync('git add .', { cwd: targetPath });
+            execSync(`git commit -m "${commitMsg}"`, { cwd: targetPath });
+            execSync('git push origin main', { cwd: targetPath });
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Error in process:', e);
+        res.status(500).json({ error: 'Process failed', details: e.message });
     }
 });
 

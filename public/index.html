@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Dashboard</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -44,14 +45,33 @@
         </section>
     </main>
 
-    <!-- Modal Bot Logs -->
-    <div id="bot-modal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>Logs: <span id="modal-bot-name"></span></h3>
+    <!-- Modal de Despliegue -->
+    <div id="deploy-modal" class="modal">
+        <div class="modal-content">
+            <h3>Actualizar y Subir: <span id="modal-project-name"></span></h3>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nueva Versión (ej: 1.0.5)</label>
+                    <input type="text" id="deploy-version" placeholder="X.X.X">
+                </div>
+                <div class="form-group">
+                    <label>Resumen de cambios (en español)</label>
+                    <textarea id="deploy-summary" rows="3" placeholder="¿Qué has cambiado?"></textarea>
+                </div>
             </div>
-            <div class="modal-body" id="bot-logs-content" style="font-family: monospace; font-size: 0.85rem; background: #0f172a; padding: 1.5rem; border-radius: 16px; max-height: 400px; overflow-y: auto;">
-                <!-- Logs here -->
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="window.closeModal()">Cancelar</button>
+                <button class="btn-primary" id="btn-confirm-deploy">Confirmar y Subir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Logs de Bot -->
+    <div id="bot-modal" class="modal">
+        <div class="modal-content">
+            <h3>Últimos mensajes: <span id="modal-bot-name"></span></h3>
+            <div id="bot-logs-content" class="logs-container">
+                <div class="spinner"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="window.closeBotModal()">Cerrar</button>

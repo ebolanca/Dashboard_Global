@@ -94,6 +94,14 @@ function renderProjects(projects) {
 
         const icon = p.icon || iconsMap[p.name] || 'fa-folder';
 
+        // Botón de Acción (Cohete): Se muestra si hay cambios locales o estamos ahead de GitHub
+        const hasChanges = p.localChanges > 0 || p.ahead > 0;
+        const actionBtn = hasChanges ? `
+            <button class="btn-action deploy-btn" onclick="openDeployModal(event, '${p.name}', '${p.version}')" title="Sincronizar y Subir cambios">
+                <i class="fa-solid fa-rocket"></i>
+            </button>
+        ` : '';
+
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
@@ -126,6 +134,7 @@ function renderProjects(projects) {
                     <button class="btn-action" onclick="window.openUrl('${p.consoleUrl}')" title="Firebase">
                         <i class="fa-solid fa-cloud"></i>
                     </button>
+                    ${actionBtn}
                 </div>
             </div>
             <div class="card-footer">
@@ -188,10 +197,13 @@ window.openUrl = (url) => window.open(url, '_blank');
 window.pullProject = async function(event, name) {
     if (event) event.stopPropagation();
     
-    const badge = event.currentTarget;
-    const originalHtml = badge.innerHTML;
-    badge.innerHTML = '<div class="spinner" style="width:14px; height:14px; border-width:2px;"></div> <span style="margin-left:8px">Actualizando...</span>';
-    badge.style.pointerEvents = 'none';
+    const badge = event ? event.currentTarget : null;
+    let originalHtml = '';
+    if (badge) {
+        originalHtml = badge.innerHTML;
+        badge.innerHTML = '<div class="spinner" style="width:14px; height:14px; border-width:2px;"></div> <span style="margin-left:8px">Actualizando...</span>';
+        badge.style.pointerEvents = 'none';
+    }
 
     try {
         const res = await fetch('/api/projects/pull', {
@@ -203,13 +215,17 @@ window.pullProject = async function(event, name) {
             fetchData();
         } else {
             alert('Error al actualizar ' + name);
-            badge.innerHTML = originalHtml;
-            badge.style.pointerEvents = 'auto';
+            if (badge) {
+                badge.innerHTML = originalHtml;
+                badge.style.pointerEvents = 'auto';
+            }
         }
     } catch (e) {
         console.error(e);
-        badge.innerHTML = originalHtml;
-        badge.style.pointerEvents = 'auto';
+        if (badge) {
+            badge.innerHTML = originalHtml;
+            badge.style.pointerEvents = 'auto';
+        }
     }
 };
 
@@ -260,6 +276,56 @@ window.showBotLogs = async (name) => {
         }
     } catch (e) {
         document.getElementById('bot-logs-content').innerText = "Error al conectar con OMEN.";
+    }
+};
+
+window.openDeployModal = (e, name, currentVersion) => {
+    if (e) e.stopPropagation();
+    document.getElementById('modal-project-name').innerText = name;
+    document.getElementById('deploy-version').value = currentVersion.replace('v', '');
+    document.getElementById('deploy-summary').value = '';
+    document.getElementById('deploy-modal').style.display = 'flex';
+    
+    document.getElementById('btn-confirm-deploy').onclick = () => window.confirmDeploy(name);
+};
+
+window.closeModal = () => {
+    document.getElementById('deploy-modal').style.display = 'none';
+};
+
+window.confirmDeploy = async (name) => {
+    const version = document.getElementById('deploy-version').value;
+    const summary = document.getElementById('deploy-summary').value;
+    
+    if(!version || !summary) {
+        alert("Por favor completa los dos campos.");
+        return;
+    }
+    
+    const btn = document.getElementById('btn-confirm-deploy');
+    btn.innerText = "Procesando...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/projects/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, version, summary })
+        });
+        
+        if (res.ok) {
+            alert("¡Operación realizada con éxito!");
+            window.closeModal();
+            fetchData();
+        } else {
+            alert("Fallo en la operación. Revisa la consola del servidor.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión con el servidor.");
+    } finally {
+        btn.innerText = "Confirmar y Subir";
+        btn.disabled = false;
     }
 };
 
