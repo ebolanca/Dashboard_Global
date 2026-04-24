@@ -252,10 +252,13 @@ app.post('/api/projects/deploy', async (req, res) => {
 
 app.get('/api/bots/logs/:name', (req, res) => {
     const botName = req.params.name;
-    // Rutas adaptadas para OMEN principalmente
+    const homeDir = os.homedir();
+    
+    // Apuntar a los logs reales de PM2 para ver el QR
     const logPaths = {
-        'whatsapp-bot-horarios': path.join(WORKSPACE_DIR, 'Horarios/public-app/whatsapp-bot/logs/whatsapp_sent_messages.log'),
-        'whatsapp-bot-lestudi': path.join(WORKSPACE_DIR, 'Alquileres/whatsapp_bot/logs/whatsapp_sent_messages.log')
+        'whatsapp-bot-horarios': path.join(homeDir, '.pm2/logs/whatsapp-bot-horarios-out.log'),
+        'whatsapp-bot-lestudi': path.join(homeDir, '.pm2/logs/whatsapp-bot-lestudi-out.log'),
+        'dashboard-global': path.join(homeDir, '.pm2/logs/dashboard-global-out.log')
     };
 
     const filePath = logPaths[botName];
@@ -265,7 +268,8 @@ app.get('/api/bots/logs/:name', (req, res) => {
 
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.trim().split('\n').slice(-10).reverse();
+        // Cogemos las últimas 50 líneas para asegurar que el QR quepa entero
+        const lines = content.trim().split('\n').slice(-50).reverse();
         res.json({ logs: lines });
     } catch (e) {
         res.status(500).json({ error: 'Error reading logs', details: e.message });
