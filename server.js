@@ -168,12 +168,25 @@ app.get('/api/projects', async (req, res) => {
                             'Domotica': 'https://github.com/ebolanca/Domotica'
                         };
 
+                        let firebaseProjectId = f.toLowerCase();
+                        const rcPath = path.join(projectPath, '.firebaserc');
+                        if (fs.existsSync(rcPath)) {
+                            try {
+                                const rcContent = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
+                                if (rcContent.projects && rcContent.projects.default) {
+                                    firebaseProjectId = rcContent.projects.default;
+                                }
+                            } catch (err) {
+                                console.error(`Error parsing .firebaserc for ${f}:`, err);
+                            }
+                        }
+
                         const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
 
                         projects.push({
                             name: f,
-                            url: urlsMap[f] || "#",
-                            consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${f.toLowerCase()}/overview` : null,
+                            url: urlsMap[f] || '#',
+                            consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
                             icon: iconsMap[f] || 'fa-folder',
                             ...baseInfo
                         });

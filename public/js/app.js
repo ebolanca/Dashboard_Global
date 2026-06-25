@@ -79,18 +79,21 @@ function renderProjects(projects) {
     };
 
     projects.forEach(p => {
-        const isUpToDate = p.behind === 0 && p.ahead === 0 && p.isClean;
         let statusClass = 'status-online';
         let statusText = 'Actualizado';
         let clickAction = "";
 
-        if(p.error) {
+        if (p.error) {
             statusClass = 'status-offline';
             statusText = 'Error Git';
-        } else if (!isUpToDate) {
+        } else if (p.behind > 0 || p.ahead > 0) {
             statusClass = 'status-warning pullable';
             statusText = `Sincronizar (${p.behind || 0}↓ ${p.ahead || 0}↑)`;
             clickAction = `onclick="window.pullProject(event, '${p.name}')"`;
+        } else if (!p.isClean) {
+            statusClass = 'status-warning pullable';
+            statusText = `Cambios locales (${p.localChanges})`;
+            clickAction = `onclick="window.openDeployModal(event, '${p.name}', '${p.version}')"`;
         }
 
         const icon = p.icon || iconsMap[p.name] || 'fa-folder';
