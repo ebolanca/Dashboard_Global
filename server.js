@@ -88,6 +88,7 @@ app.get('/api/projects', async (req, res) => {
                         path.join(projectPath, 'public-app', 'js', 'main.js'),
                         path.join(projectPath, 'public', 'js', 'main.js'),
                         path.join(projectPath, 'package.json'),
+                        path.join(projectPath, 'manifest.json'),
                         path.join(projectPath, 'public', 'index.html')
                     ];
 
@@ -121,19 +122,34 @@ app.get('/api/projects', async (req, res) => {
 
                     if (f === 'Alquileres') {
                         const firebaseLink = "https://console.firebase.google.com/project/alquiler-pisos-23550/overview";
+                        
+                        const getSubProjectVersion = (subDir) => {
+                            const htmlPath = path.join(projectPath, subDir, 'index.html');
+                            if (fs.existsSync(htmlPath)) {
+                                const content = fs.readFileSync(htmlPath, 'utf8');
+                                const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+)[^<]*<\/title>/i);
+                                if (titleMatch) return `v${titleMatch[1]}`;
+                                const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/i);
+                                if (appVersionMatch) return `v${appVersionMatch[1]}`;
+                            }
+                            return 'v?';
+                        };
+
                         projects.push({ 
                             name: "Alquileres (Garlopan)", 
                             url: "https://alquiler-pisos-23550.web.app", 
                             consoleUrl: firebaseLink, 
                             icon: 'fa-house',
-                            ...baseInfo 
+                            ...baseInfo,
+                            version: getSubProjectVersion('public - garlopan')
                         });
                         projects.push({ 
                             name: "Alquileres (L'estudi)", 
                             url: "https://lestudi.web.app", 
                             consoleUrl: firebaseLink, 
                             icon: 'fa-building',
-                            ...baseInfo 
+                            ...baseInfo,
+                            version: getSubProjectVersion('public - lestudi')
                         });
                     } else {
                         const iconsMap = {
@@ -141,19 +157,23 @@ app.get('/api/projects', async (req, res) => {
                             'Pedidos': 'fa-box',
                             'Vacaciones': 'fa-plane',
                             'Viajes': 'fa-earth-americas',
-                            'Dashboard_Global': 'fa-gauge-high'
+                            'Dashboard_Global': 'fa-gauge-high',
+                            'Domotica': 'fa-house-laptop'
                         };
                         
                         const urlsMap = {
                             'Horarios': 'https://horarios-rail.web.app',
                             'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
-                            'Vacaciones': 'https://viajes-en-caravana.web.app/'
+                            'Vacaciones': 'https://viajes-en-caravana.web.app/',
+                            'Domotica': 'https://github.com/ebolanca/Domotica'
                         };
+
+                        const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
 
                         projects.push({
                             name: f,
                             url: urlsMap[f] || "#",
-                            consoleUrl: `https://console.firebase.google.com/project/${f.toLowerCase()}/overview`,
+                            consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${f.toLowerCase()}/overview` : null,
                             icon: iconsMap[f] || 'fa-folder',
                             ...baseInfo
                         });

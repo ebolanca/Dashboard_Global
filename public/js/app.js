@@ -74,7 +74,8 @@ function renderProjects(projects) {
         'Pedidos': 'fa-box',
         'Vacaciones': 'fa-plane',
         'Viajes': 'fa-earth-americas',
-        'Dashboard_Global': 'fa-gauge-high'
+        'Dashboard_Global': 'fa-gauge-high',
+        'Domotica': 'fa-house-laptop'
     };
 
     projects.forEach(p => {
@@ -99,6 +100,12 @@ function renderProjects(projects) {
         const actionBtn = hasChanges ? `
             <button class="btn-action deploy-btn" onclick="openDeployModal(event, '${p.name}', '${p.version}')" title="Sincronizar y Subir cambios">
                 <i class="fa-solid fa-rocket"></i>
+            </button>
+        ` : '';
+
+        const firebaseBtn = (p.consoleUrl && p.consoleUrl !== '#') ? `
+            <button class="btn-action" onclick="window.openUrl(event, '${p.consoleUrl}')" title="Firebase">
+                <i class="fa-solid fa-cloud"></i>
             </button>
         ` : '';
 
@@ -134,9 +141,7 @@ function renderProjects(projects) {
                     <button class="btn-action" onclick="window.openUrl(event, '${p.githubUrl}')" title="GitHub">
                         <i class="fa-brands fa-github"></i>
                     </button>
-                    <button class="btn-action" onclick="window.openUrl(event, '${p.consoleUrl}')" title="Firebase">
-                        <i class="fa-solid fa-cloud"></i>
-                    </button>
+                    ${firebaseBtn}
                     ${actionBtn}
                 </div>
             </div>
