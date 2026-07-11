@@ -299,9 +299,12 @@ window.showBotLogs = async (name) => {
         const data = await res.json();
         
         if (data.logs && data.logs.length > 0) {
-            document.getElementById('bot-logs-content').innerHTML = data.logs
-                .map(line => `<div style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1;">${line}</div>`)
-                .join('');
+            const logsText = data.logs.join('\n');
+            document.getElementById('bot-logs-content').innerHTML = `<pre class="terminal-logs">${logsText}</pre>`;
+            
+            // Auto scroll to bottom
+            const container = document.getElementById('bot-logs-content');
+            container.scrollTop = container.scrollHeight;
         } else {
             document.getElementById('bot-logs-content').innerHTML = '<div style="color: var(--text-muted)">No hay logs recientes.</div>';
         }

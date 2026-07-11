@@ -433,3 +433,21 @@ body {
     .header h1 { font-size: 2rem; }
     .grid { grid-template-columns: 1fr; }
 }
+
+/* Estilos específicos para el modal de logs de bot */
+#bot-modal .modal-content {
+    max-width: 700px;
+    width: 90%;
+}
+
+.terminal-logs {
+    margin: 0;
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', Courier, monospace;
+    font-size: 10px;
+    line-height: 1.0;
+    letter-spacing: 0;
+    white-space: pre;
+    color: #cbd5e1;
+    word-break: normal;
+    overflow-x: auto;
+}

@@ -301,8 +301,8 @@ app.get('/api/bots/logs/:name', (req, res) => {
 
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        // Cogemos las últimas 50 líneas para asegurar que el QR quepa entero
-        const lines = content.trim().split('\n').slice(-50).reverse();
+        // Obtenemos las últimas 150 líneas en orden cronológico (sin revertir) para ver el QR correctamente
+        const lines = content.trim().split('\n').slice(-150);
         res.json({ logs: lines });
     } catch (e) {
         res.status(500).json({ error: 'Error reading logs', details: e.message });
