@@ -285,32 +285,48 @@ window.syncAllProjects = async function() {
     await fetchData();
 };
 
+let logInterval = null;
+
 window.showBotLogs = async (name) => {
     document.getElementById('modal-bot-name').innerText = name;
     document.getElementById('bot-logs-content').innerHTML = '<div class="spinner"></div>';
     document.getElementById('bot-modal').style.display = 'flex';
 
-    try {
-        const url = config.pcName === 'MSI' 
-            ? `http://${config.remoteServerIp}:4000/api/bots/logs/${name}` 
-            : `/api/bots/logs/${name}`;
+    const fetchLogs = async () => {
+        try {
+            const url = config.pcName === 'MSI' 
+                ? `http://${config.remoteServerIp}:4000/api/bots/logs/${name}` 
+                : `/api/bots/logs/${name}`;
+                
+            const res = await fetch(url);
+            const data = await res.json();
             
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (data.logs && data.logs.length > 0) {
-            const logsText = data.logs.join('\n');
-            document.getElementById('bot-logs-content').innerHTML = `<pre class="terminal-logs">${logsText}</pre>`;
-            
-            // Auto scroll to bottom
-            const container = document.getElementById('bot-logs-content');
-            container.scrollTop = container.scrollHeight;
-        } else {
-            document.getElementById('bot-logs-content').innerHTML = '<div style="color: var(--text-muted)">No hay logs recientes.</div>';
+            if (data.logs && data.logs.length > 0) {
+                const logsText = data.logs.join('\n');
+                const container = document.getElementById('bot-logs-content');
+                const preElement = container.querySelector('.terminal-logs');
+                
+                // Evitamos parpadeos y saltos de scroll si los logs no han cambiado
+                if (!preElement || preElement.textContent !== logsText) {
+                    container.innerHTML = `<pre class="terminal-logs">${logsText}</pre>`;
+                    container.scrollTop = container.scrollHeight;
+                }
+            } else {
+                document.getElementById('bot-logs-content').innerHTML = '<div style="color: var(--text-muted)">No hay logs recientes.</div>';
+            }
+        } catch (e) {
+            document.getElementById('bot-logs-content').innerText = "Error al conectar con OMEN.";
         }
-    } catch (e) {
-        document.getElementById('bot-logs-content').innerText = "Error al conectar con OMEN.";
-    }
+    };
+
+    // Carga inicial
+    await fetchLogs();
+
+    // Limpiamos cualquier intervalo activo previo
+    if (logInterval) clearInterval(logInterval);
+    
+    // Auto-actualizar logs cada 5 segundos mientras esté abierto el modal para capturar el QR fresco
+    logInterval = setInterval(fetchLogs, 5000);
 };
 
 window.openDeployModal = (e, name, currentVersion) => {
@@ -364,6 +380,10 @@ window.confirmDeploy = async (name) => {
 };
 
 window.closeBotModal = () => {
+    if (logInterval) {
+        clearInterval(logInterval);
+        logInterval = null;
+    }
     document.getElementById('bot-modal').style.display = 'none';
 };
 

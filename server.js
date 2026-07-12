@@ -301,8 +301,27 @@ app.get('/api/bots/logs/:name', (req, res) => {
 
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        // Obtenemos las últimas 150 líneas en orden cronológico (sin revertir) para ver el QR correctamente
-        const lines = content.trim().split('\n').slice(-150);
+        let lines = content.trim().split('\n');
+        
+        // Buscamos la última aparición del código QR en los logs para mostrar a partir de ahí
+        // y evitar acumulados de códigos QR viejos y ya expirados.
+        const qrMarkers = ["Escanea el QR", "SCAN QR CODE"];
+        let lastQrIndex = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            if (qrMarkers.some(marker => lines[i].includes(marker))) {
+                lastQrIndex = i;
+                break;
+            }
+        }
+        
+        if (lastQrIndex !== -1) {
+            // Devolvemos desde la última aparición del QR (siempre que el QR no sea extremadamente viejo)
+            lines = lines.slice(lastQrIndex);
+        } else {
+            // Si no hay QR, enviamos las últimas 100 líneas
+            lines = lines.slice(-100);
+        }
+        
         res.json({ logs: lines });
     } catch (e) {
         res.status(500).json({ error: 'Error reading logs', details: e.message });
