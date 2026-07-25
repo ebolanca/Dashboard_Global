@@ -222,6 +222,44 @@ app.post('/api/projects/pull', async (req, res) => {
     }
 });
 
+app.post('/api/projects/pull-all', async (req, res) => {
+    try {
+        if (!fs.existsSync(WORKSPACE_DIR)) {
+            return res.status(404).json({ error: `Workspace directory not found: ${WORKSPACE_DIR}` });
+        }
+
+        const folders = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+        const results = [];
+        const processedFolders = new Set();
+
+        for (const f of folders) {
+            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git') continue;
+            if (processedFolders.has(f)) continue;
+            
+            const projectPath = path.join(WORKSPACE_DIR, f);
+            const gitPath = path.join(projectPath, '.git');
+            
+            if (fs.existsSync(gitPath)) {
+                processedFolders.add(f);
+                try {
+                    const git = simpleGit(projectPath);
+                    const pullResult = await git.pull(['--autostash']).catch(e => ({ error: e.message }));
+                    results.push({ name: f, result: pullResult });
+                } catch (e) {
+                    results.push({ name: f, error: e.message });
+                }
+            }
+        }
+
+        res.json({ success: true, results });
+    } catch (e) {
+        res.status(500).json({ error: 'Pull all failed', details: e.message });
+    }
+});
+
 app.post('/api/projects/deploy', async (req, res) => {
     try {
         const { name, version, summary } = req.body;

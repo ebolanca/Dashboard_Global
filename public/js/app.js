@@ -253,36 +253,28 @@ window.syncAllProjects = async function() {
     if (!btn) return;
 
     const originalContent = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando todo...';
     btn.disabled = true;
 
-    const pullables = Array.from(document.querySelectorAll('.status-badge.pullable'));
-    if (pullables.length === 0) {
-        alert("Todos los proyectos están al día.");
+    try {
+        const res = await fetch('/api/projects/pull-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.details || 'Error al sincronizar proyectos');
+        }
+        
+        await fetchData();
+    } catch (err) {
+        console.error("Error en syncAllProjects:", err);
+        alert(`Error al sincronizar todo: ${err.message}`);
+    } finally {
         btn.innerHTML = originalContent;
         btn.disabled = false;
-        return;
     }
-
-    // Procesar uno por uno para evitar conflictos de git lock
-    for (const badge of pullables) {
-        const card = badge.closest('.card');
-        if (!card) continue;
-        const nameDisplay = card.querySelector('.card-title');
-        const name = nameDisplay ? nameDisplay.innerText.split('\n')[0].trim() : '';
-        
-        if (name) {
-            try {
-                await window.pullProject(null, name);
-            } catch (err) {
-                console.error(`Error sincronizando ${name}`, err);
-            }
-        }
-    }
-
-    btn.innerHTML = originalContent;
-    btn.disabled = false;
-    await fetchData();
 };
 
 let logInterval = null;
