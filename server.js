@@ -215,7 +215,7 @@ app.post('/api/projects/pull', async (req, res) => {
         if (!fs.existsSync(projectPath)) return res.status(404).json({ error: `Project folder not found: ${folderName}` });
         
         const git = simpleGit(projectPath);
-        const pullResult = await git.pull();
+        const pullResult = await git.pull(['--autostash']);
         res.json({ success: true, details: pullResult });
     } catch (e) {
         res.status(500).json({ error: 'Pull failed', details: e.message });
