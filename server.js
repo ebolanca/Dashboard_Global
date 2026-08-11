@@ -62,141 +62,146 @@ app.get('/api/projects', async (req, res) => {
             .filter(dirent => dirent.isDirectory())
             .map(dirent => dirent.name);
 
-        const projects = [];
-
-        for (const f of folders) {
+        const results = await Promise.all(folders.map(async (f) => {
             const projectPath = path.join(WORKSPACE_DIR, f);
             const gitPath = path.join(projectPath, '.git');
             
-            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git') continue;
+            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || !fs.existsSync(gitPath)) {
+                return [];
+            }
             
-            if (fs.existsSync(gitPath)) {
-                try {
-                    const git = simpleGit(projectPath);
-                    
-                    // Fetch silencioso para actualizar estado remoto
-                    await git.fetch().catch(e => console.log(`Fetch failed for ${f}, continuing with local status`));
-                    
-                    const status = await git.status();
-                    const log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
-                    const lastCommit = log.latest ? log.latest.message : 'No commits';
+            try {
+                const git = simpleGit(projectPath);
+                
+                // Fetch silencioso para actualizar estado remoto (máx 3s timeout)
+                await Promise.race([
+                    git.fetch().catch(() => {}),
+                    new Promise(resolve => setTimeout(resolve, 3000))
+                ]);
+                
+                const status = await git.status();
+                const log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
+                const lastCommit = log.latest ? log.latest.message : 'No commits';
 
-                    // Extracción de versión mejorada
-                    let version = 'v?';
-                    const versionPaths = [
-                        path.join(projectPath, 'public', 'js', 'modules', 'constants.js'),
-                        path.join(projectPath, 'public-app', 'js', 'main.js'),
-                        path.join(projectPath, 'public', 'js', 'main.js'),
-                        path.join(projectPath, 'package.json'),
-                        path.join(projectPath, 'manifest.json'),
-                        path.join(projectPath, 'public', 'index.html')
-                    ];
+                // Extracción de versión mejorada
+                let version = 'v?';
+                const versionPaths = [
+                    path.join(projectPath, 'public', 'js', 'modules', 'constants.js'),
+                    path.join(projectPath, 'public-app', 'js', 'main.js'),
+                    path.join(projectPath, 'public', 'js', 'main.js'),
+                    path.join(projectPath, 'package.json'),
+                    path.join(projectPath, 'manifest.json'),
+                    path.join(projectPath, 'public', 'index.html')
+                ];
 
-                    for (const vPath of versionPaths) {
-                        if (fs.existsSync(vPath)) {
-                            const content = fs.readFileSync(vPath, 'utf8');
-                            const lines = content.split('\n');
-                            let found = false;
-                            for(let line of lines) {
-                                if (line.trim().startsWith('//')) continue;
-                                const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["'](\d+\.\d+)["']/) || 
-                                                line.match(/version:\s*["'](\d+\.\d+)["']/);
-                                if (jsMatch) { version = `v${jsMatch[2]}`; found = true; break; }
-                                const pkgMatch = line.match(/"version":\s*"(\d+\.\d+\.\d+)"/);
-                                if (pkgMatch) { version = `v${pkgMatch[1]}`; found = true; break; }
-                            }
-                            if (found) break;
+                for (const vPath of versionPaths) {
+                    if (fs.existsSync(vPath)) {
+                        const content = fs.readFileSync(vPath, 'utf8');
+                        const lines = content.split('\n');
+                        let found = false;
+                        for(let line of lines) {
+                            if (line.trim().startsWith('//')) continue;
+                            const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["'](\d+\.\d+)["']/) || 
+                                            line.match(/version:\s*["'](\d+\.\d+)["']/);
+                            if (jsMatch) { version = `v${jsMatch[2]}`; found = true; break; }
+                            const pkgMatch = line.match(/"version":\s*"(\d+\.\d+\.\d+)"/);
+                            if (pkgMatch) { version = `v${pkgMatch[1]}`; found = true; break; }
                         }
+                        if (found) break;
                     }
+                }
+                
+                const baseInfo = {
+                    branch: status.current,
+                    behind: status.behind,
+                    ahead: status.ahead,
+                    localChanges: status.files.length,
+                    isClean: status.isClean(),
+                    lastCommit: lastCommit,
+                    version: version,
+                    githubUrl: `https://github.com/ebolanca/${f}`
+                };
+
+                if (f === 'Alquileres') {
+                    const firebaseLink = "https://console.firebase.google.com/project/alquiler-pisos-23550/overview";
                     
-                    const baseInfo = {
-                        branch: status.current,
-                        behind: status.behind,
-                        ahead: status.ahead,
-                        localChanges: status.files.length,
-                        isClean: status.isClean(),
-                        lastCommit: lastCommit,
-                        version: version,
-                        githubUrl: `https://github.com/ebolanca/${f}`
+                    const getSubProjectVersion = (subDir) => {
+                        const htmlPath = path.join(projectPath, subDir, 'index.html');
+                        if (fs.existsSync(htmlPath)) {
+                            const content = fs.readFileSync(htmlPath, 'utf8');
+                            const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+)[^<]*<\/title>/i);
+                            if (titleMatch) return `v${titleMatch[1]}`;
+                            const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/i);
+                            if (appVersionMatch) return `v${appVersionMatch[1]}`;
+                        }
+                        return 'v?';
                     };
 
-                    if (f === 'Alquileres') {
-                        const firebaseLink = "https://console.firebase.google.com/project/alquiler-pisos-23550/overview";
-                        
-                        const getSubProjectVersion = (subDir) => {
-                            const htmlPath = path.join(projectPath, subDir, 'index.html');
-                            if (fs.existsSync(htmlPath)) {
-                                const content = fs.readFileSync(htmlPath, 'utf8');
-                                const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+)[^<]*<\/title>/i);
-                                if (titleMatch) return `v${titleMatch[1]}`;
-                                const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/i);
-                                if (appVersionMatch) return `v${appVersionMatch[1]}`;
-                            }
-                            return 'v?';
-                        };
-
-                        projects.push({ 
+                    return [
+                        { 
                             name: "Alquileres (Garlopan)", 
                             url: "https://alquiler-pisos-23550.web.app", 
                             consoleUrl: firebaseLink, 
                             icon: 'fa-house',
                             ...baseInfo,
                             version: getSubProjectVersion('public - garlopan')
-                        });
-                        projects.push({ 
+                        },
+                        { 
                             name: "Alquileres (L'estudi)", 
                             url: "https://lestudi.web.app", 
                             consoleUrl: firebaseLink, 
                             icon: 'fa-building',
                             ...baseInfo,
                             version: getSubProjectVersion('public - lestudi')
-                        });
-                    } else {
-                        const iconsMap = {
-                            'Horarios': 'fa-calendar-days',
-                            'Pedidos': 'fa-box',
-                            'Vacaciones': 'fa-plane',
-                            'Viajes': 'fa-earth-americas',
-                            'Dashboard_Global': 'fa-gauge-high',
-                            'Domotica': 'fa-house-laptop'
-                        };
-                        
-                        const urlsMap = {
-                            'Horarios': 'https://horarios-rail.web.app',
-                            'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
-                            'Vacaciones': 'https://viajes-en-caravana.web.app/',
-                            'Domotica': 'https://github.com/ebolanca/Domotica'
-                        };
-
-                        let firebaseProjectId = f.toLowerCase();
-                        const rcPath = path.join(projectPath, '.firebaserc');
-                        if (fs.existsSync(rcPath)) {
-                            try {
-                                const rcContent = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
-                                if (rcContent.projects && rcContent.projects.default) {
-                                    firebaseProjectId = rcContent.projects.default;
-                                }
-                            } catch (err) {
-                                console.error(`Error parsing .firebaserc for ${f}:`, err);
-                            }
                         }
+                    ];
+                } else {
+                    const iconsMap = {
+                        'Horarios': 'fa-calendar-days',
+                        'Pedidos': 'fa-box',
+                        'Vacaciones': 'fa-plane',
+                        'Viajes': 'fa-earth-americas',
+                        'Dashboard_Global': 'fa-gauge-high',
+                        'Domotica': 'fa-house-laptop'
+                    };
+                    
+                    const urlsMap = {
+                        'Horarios': 'https://horarios-rail.web.app',
+                        'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
+                        'Vacaciones': 'https://viajes-en-caravana.web.app/',
+                        'Domotica': 'https://github.com/ebolanca/Domotica'
+                    };
 
-                        const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
-
-                        projects.push({
-                            name: f,
-                            url: urlsMap[f] || '#',
-                            consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
-                            icon: iconsMap[f] || 'fa-folder',
-                            ...baseInfo
-                        });
+                    let firebaseProjectId = f.toLowerCase();
+                    const rcPath = path.join(projectPath, '.firebaserc');
+                    if (fs.existsSync(rcPath)) {
+                        try {
+                            const rcContent = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
+                            if (rcContent.projects && rcContent.projects.default) {
+                                firebaseProjectId = rcContent.projects.default;
+                            }
+                        } catch (err) {
+                            console.error(`Error parsing .firebaserc for ${f}:`, err);
+                        }
                     }
-                } catch (e) {
-                    console.error(`Error checking git for ${f}`, e);
-                    projects.push({ name: f, error: 'Git error', details: e.message });
+
+                    const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
+
+                    return [{
+                        name: f,
+                        url: urlsMap[f] || '#',
+                        consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
+                        icon: iconsMap[f] || 'fa-folder',
+                        ...baseInfo
+                    }];
                 }
+            } catch (e) {
+                console.error(`Error checking git for ${f}`, e);
+                return [{ name: f, error: 'Git error', details: e.message }];
             }
-        }
+        }));
+
+        const projects = results.flat();
         res.json(projects);
     } catch (e) {
         res.status(500).json({ error: 'Cannot read workspace directory', details: e.message });
@@ -366,7 +371,55 @@ app.get('/api/bots/logs/:name', (req, res) => {
     }
 });
 
+// --- API CONTROL DOCKER ---
+const { execFile } = require('child_process');
+
+app.get('/api/docker/status', (req, res) => {
+    execFile('docker.exe', ['ps', '-a', '--format', '{{.Names}}::{{.State}}'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to query docker ps', details: err.message });
+        }
+        const containers = {};
+        const lines = (stdout || '').trim().split('\n');
+        lines.forEach(line => {
+            if (!line) return;
+            const parts = line.trim().split('::');
+            if (parts.length >= 2) {
+                containers[parts[0].trim()] = parts[1].trim();
+            }
+        });
+        res.json(containers);
+    });
+});
+
+app.post('/api/docker/toggle', (req, res) => {
+    const { container } = req.body;
+    if (!container) return res.status(400).json({ error: 'Missing container parameter' });
+    
+    if (!/^[a-zA-Z0-9_-]+$/.test(container)) {
+        return res.status(400).json({ error: 'Invalid container name format' });
+    }
+
+    execFile('docker.exe', ['inspect', '--format={{.State.Running}}', container], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+        if (err) {
+            return res.status(404).json({ error: `Container ${container} not found` });
+        }
+        const isRunning = (stdout || '').trim() === 'true';
+        const action = isRunning ? 'stop' : 'start';
+
+        console.log(`🐳 Ejecutando comando Docker: docker.exe ${action} ${container}`);
+        execFile('docker.exe', [action, container], { timeout: 30000, windowsHide: true }, (actionErr) => {
+            if (actionErr) {
+                console.error(`Error al alternar estado de ${container}:`, actionErr);
+                return res.status(500).json({ error: `Failed to ${action} ${container}`, details: actionErr.message });
+            }
+            res.json({ success: true, container, action, running: !isRunning });
+        });
+    });
+});
+
 const PORT = 4000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Dashboard [${PC_NAME}] running on http://localhost:${PORT}`);
 });
+

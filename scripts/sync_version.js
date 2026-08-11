@@ -7,8 +7,13 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const newVersion = process.argv[2];
 if (newVersion) {
     pkg.version = newVersion.replace('v', '');
-    console.log(`Actualizando a v${pkg.version}...`);
+} else {
+    // Auto-incrementar patch: 1.0.11 → 1.0.12
+    const parts = pkg.version.split('.');
+    parts[parts.length - 1] = String(Number(parts[parts.length - 1]) + 1);
+    pkg.version = parts.join('.');
 }
 
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+console.log(`Versión actualizada: v${pkg.version}`);
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 console.log('¡Sincronización completada!');
