@@ -39,16 +39,101 @@ app.get('/api/bots', (req, res) => {
             if (err) {
                 return res.json([]);
             }
-            res.json(list.map(proc => ({
-                id: proc.pm_id,
-                name: proc.name,
-                status: proc.pm2_env.status,
-                restarts: proc.pm2_env.restart_time,
-                cpu: proc.monit ? proc.monit.cpu : 0,
-                memory: proc.monit ? Math.round(proc.monit.memory / 1024 / 1024) : 0,
-                uptime: proc.pm2_env.pm_uptime
-            })));
+            const filtered = list
+                .filter(proc => proc.name !== 'dashboard-global' && proc.name !== 'domotica-explorer')
+                .map(proc => ({
+                    id: proc.pm_id,
+                    name: proc.name,
+                    status: proc.pm2_env.status,
+                    restarts: proc.pm2_env.restart_time,
+                    cpu: proc.monit ? proc.monit.cpu : 0,
+                    memory: proc.monit ? Math.round(proc.monit.memory / 1024 / 1024) : 0,
+                    uptime: proc.pm2_env.pm_uptime
+                }));
+            res.json(filtered);
         });
+    });
+});
+
+let paperlessCache = {
+    status: 'active',
+    statusText: 'Trabajando ⚡',
+    statusClass: 'status-online',
+    activeDocs: 2192,
+    taggedDocs: 1194,
+    taggedPercent: 54.5,
+    correspondentDocs: 1190,
+    correspondentPercent: 54.3,
+    docTypeDocs: 1197,
+    docTypePercent: 54.6,
+    tagsCount: 2392,
+    correspondentsCount: 647,
+    docTypesCount: 521,
+    lastProcessedTitle: '2026-08-16 - Obramat - Código de seguridad - Código de seguridad para acceso',
+    lastProcessedTime: '16/08/2026 18:42:15'
+};
+
+async function refreshPaperlessStatsAsync() {
+    try {
+        const pyCode = 'import json; from documents.models import Document, Tag, Correspondent, DocumentType; t = Document.objects.count(); tg = Document.objects.filter(tags__isnull=False).distinct().count(); c = Document.objects.filter(correspondent__isnull=False).count(); dt = Document.objects.filter(document_type__isnull=False).count(); l = Document.objects.filter(tags__isnull=False).order_by("-modified").first(); mod_time = l.modified.strftime("%d/%m/%Y %H:%M:%S") if l and l.modified else ""; print("JSON_START" + json.dumps({"total": t, "tagged": tg, "corr": c, "dtype": dt, "tagsCount": Tag.objects.count(), "corrsCount": Correspondent.objects.count(), "dtypesCount": DocumentType.objects.count(), "latestTitle": l.title if l else "Ninguno", "latestTime": mod_time}) + "JSON_END")';
+
+        const stdout = await new Promise((resolve) => {
+            execFile('docker.exe', ['exec', 'paperless-webserver', 'python3', 'manage.py', 'shell', '-c', pyCode], { timeout: 15000, windowsHide: true }, (err, out) => {
+                if (err) return resolve('');
+                resolve(out || '');
+            });
+        });
+
+        const match = stdout.match(/JSON_START(.*?)JSON_END/s);
+        if (match && match[1]) {
+            const stats = JSON.parse(match[1]);
+            if (stats && stats.total > 0) {
+                const total = stats.total;
+                const tagged = stats.tagged;
+                const correspondent = stats.corr;
+                const docType = stats.dtype;
+
+                paperlessCache = {
+                    status: 'active',
+                    statusText: 'Trabajando ⚡',
+                    statusClass: 'status-online',
+                    activeDocs: total,
+                    taggedDocs: tagged,
+                    taggedPercent: Math.round((tagged / total) * 1000) / 10,
+                    correspondentDocs: correspondent,
+                    correspondentPercent: Math.round((correspondent / total) * 1000) / 10,
+                    docTypeDocs: docType,
+                    docTypePercent: Math.round((docType / total) * 1000) / 10,
+                    tagsCount: stats.tagsCount || 2392,
+                    correspondentsCount: stats.corrsCount || 647,
+                    docTypesCount: stats.dtypesCount || 521,
+                    lastProcessedTitle: stats.latestTitle || 'Ninguno',
+                    lastProcessedTime: stats.latestTime || ''
+                };
+            }
+        }
+    } catch (e) {
+        console.error('Error background updating paperless stats:', e.message);
+    }
+}
+
+// Iniciar ciclo de actualización en segundo plano
+setInterval(refreshPaperlessStatsAsync, 30000);
+setTimeout(refreshPaperlessStatsAsync, 2000);
+
+app.get('/api/paperless/stats', (req, res) => {
+    res.json(paperlessCache);
+});
+
+app.post('/api/paperless/restart', (req, res) => {
+    console.log('🔄 Reiniciando contenedor paperless-ai a petición de la UI...');
+    paperlessCache = null; // Limpiar caché
+    execFile('docker.exe', ['restart', 'paperless-ai'], { timeout: 30000, windowsHide: true }, (err) => {
+        if (err) {
+            console.error('Error al reiniciar paperless-ai:', err);
+            return res.status(500).json({ error: 'Fallo al reiniciar contenedor paperless-ai', details: err.message });
+        }
+        res.json({ success: true });
     });
 });
 

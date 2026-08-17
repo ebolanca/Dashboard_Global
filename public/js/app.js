@@ -53,6 +53,7 @@ async function fetchData() {
         }
         
         renderBots(finalBots);
+        fetchPaperlessStats();
         
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -381,3 +382,135 @@ window.closeBotModal = () => {
 
 // Iniciar
 init();
+
+async function fetchPaperlessStats() {
+    try {
+        const res = await fetch('/api/paperless/stats');
+        const data = await res.json();
+        renderPaperlessStats(data);
+    } catch (e) {
+        console.error('Error cargando métricas de Paperless:', e);
+        const container = document.getElementById('paperless-container');
+        if (container) {
+            container.innerHTML = '<div class="card"><p>Error conectando con Paperless API.</p></div>';
+        }
+    }
+}
+
+function renderPaperlessStats(data) {
+    const badge = document.getElementById('paperless-status-badge');
+    const badgeText = document.getElementById('paperless-status-text');
+    const container = document.getElementById('paperless-container');
+
+    if (!data || data.error) {
+        if (badge) {
+            badge.className = 'status-badge status-offline';
+        }
+        if (badgeText) badgeText.innerText = 'Desconectado';
+        if (container) container.innerHTML = '<div class="card"><p>No disponible.</p></div>';
+        return;
+    }
+
+    if (badge) {
+        badge.className = `status-badge ${data.statusClass || 'status-online'}`;
+    }
+    if (badgeText) {
+        badgeText.innerText = data.statusText || 'En línea';
+    }
+
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-brain card-icon" style="color: #a855f7; font-size: 1.3em;"></i>
+                    <div class="card-title" style="font-size: 1.15em; font-weight: 700;">Progreso de Análisis de IA</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Documentos Totales Activos</div>
+                        <div style="font-size: 1.6em; font-weight: 700; color: #fff;">${data.activeDocs ? data.activeDocs.toLocaleString('es-ES') : 0}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Etiquetados (Tags)</div>
+                        <div style="font-size: 1.6em; font-weight: 700; color: #3b82f6;">${data.taggedDocs ? data.taggedDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #93c5fd;">(${data.taggedPercent}%)</span></div>
+                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                            <div style="background: #3b82f6; height: 100%; width: ${data.taggedPercent}%;"></div>
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Con Corresponsal (Emisor)</div>
+                        <div style="font-size: 1.6em; font-weight: 700; color: #10b981;">${data.correspondentDocs ? data.correspondentDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #6ee7b7;">(${data.correspondentPercent}%)</span></div>
+                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                            <div style="background: #10b981; height: 100%; width: ${data.correspondentPercent}%;"></div>
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Con Tipo de Documento</div>
+                        <div style="font-size: 1.6em; font-weight: 700; color: #f59e0b;">${data.docTypeDocs ? data.docTypeDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #fde68a;">(${data.docTypePercent}%)</span></div>
+                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                            <div style="background: #f59e0b; height: 100%; width: ${data.docTypePercent}%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-row" style="margin-top: 10px;">
+                    <span>Etiquetas únicas generadas:</span>
+                    <span class="detail-value" style="color: #60a5fa;">${data.tagsCount ? data.tagsCount.toLocaleString('es-ES') : 0}</span>
+                </div>
+                <div class="detail-row">
+                    <span>Corresponsales identificados:</span>
+                    <span class="detail-value" style="color: #34d399;">${data.correspondentsCount ? data.correspondentsCount.toLocaleString('es-ES') : 0}</span>
+                </div>
+                <div class="detail-row">
+                    <span>Tipos de documento clasificados:</span>
+                    <span class="detail-value" style="color: #fbbf24;">${data.docTypesCount ? data.docTypesCount.toLocaleString('es-ES') : 0}</span>
+                </div>
+                <div class="commit-msg" style="margin-top: 14px; font-size: 0.88em; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 10px 14px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 250px;">
+                        <i class="fa-solid fa-clock-rotate-left" style="color: #c084fc;"></i>
+                        <span>Último analizado: <strong style="color: #f3e8ff;">${data.lastProcessedTitle || 'Cargando...'}</strong></span>
+                    </div>
+                    ${data.lastProcessedTime ? `
+                        <div style="font-size: 0.85em; color: #d8b4fe; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500;">
+                            <i class="fa-regular fa-clock" style="color: #c084fc;"></i>
+                            <span>${data.lastProcessedTime}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.restartPaperlessAI = async function(e) {
+    if (e) e.stopPropagation();
+    const btn = e ? e.currentTarget : null;
+    let originalText = '';
+    if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reiniciando...';
+        btn.disabled = true;
+    }
+
+    try {
+        const res = await fetch('/api/paperless/restart', { method: 'POST' });
+        if (res.ok) {
+            alert('¡Servicio de IA de Paperless reiniciado con éxito!');
+            setTimeout(fetchPaperlessStats, 2000);
+        } else {
+            alert('No se pudo reiniciar el servicio de IA.');
+        }
+    } catch (err) {
+        console.error('Error al reiniciar IA:', err);
+        alert('Error de conexión.');
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+};
