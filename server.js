@@ -75,10 +75,10 @@ let paperlessCache = {
 
 async function refreshPaperlessStatsAsync() {
     try {
-        const pyCode = 'import json; from documents.models import Document, Tag, Correspondent, DocumentType; t = Document.objects.count(); tg = Document.objects.filter(tags__isnull=False).distinct().count(); c = Document.objects.filter(correspondent__isnull=False).count(); dt = Document.objects.filter(document_type__isnull=False).count(); l = Document.objects.filter(tags__isnull=False).order_by("-modified").first(); mod_time = l.modified.strftime("%d/%m/%Y %H:%M:%S") if l and l.modified else ""; print("JSON_START" + json.dumps({"total": t, "tagged": tg, "corr": c, "dtype": dt, "tagsCount": Tag.objects.count(), "corrsCount": Correspondent.objects.count(), "dtypesCount": DocumentType.objects.count(), "latestTitle": l.title if l else "Ninguno", "latestTime": mod_time}) + "JSON_END")';
+        const pyCode = 'import json; from documents.models import Document, Tag, Correspondent, DocumentType; from django.utils import timezone; t = Document.objects.count(); tg = Document.objects.filter(tags__isnull=False).distinct().count(); c = Document.objects.filter(correspondent__isnull=False).count(); dt = Document.objects.filter(document_type__isnull=False).count(); l = Document.objects.filter(tags__isnull=False).order_by("-modified").first(); mod_time = timezone.template_localtime(l.modified).strftime("%d/%m/%Y %H:%M:%S") if l and l.modified else ""; print("JSON_START" + json.dumps({"total": t, "tagged": tg, "corr": c, "dtype": dt, "tagsCount": Tag.objects.count(), "corrsCount": Correspondent.objects.count(), "dtypesCount": DocumentType.objects.count(), "latestTitle": l.title if l else "Ninguno", "latestTime": mod_time}) + "JSON_END")';
 
         const stdout = await new Promise((resolve) => {
-            execFile('docker.exe', ['exec', 'paperless-webserver', 'python3', 'manage.py', 'shell', '-c', pyCode], { timeout: 15000, windowsHide: true }, (err, out) => {
+            execFile('docker.exe', ['exec', 'paperless-webserver', 'python3', 'manage.py', 'shell', '-c', pyCode], { timeout: 35000, windowsHide: true }, (err, out) => {
                 if (err) return resolve('');
                 resolve(out || '');
             });
