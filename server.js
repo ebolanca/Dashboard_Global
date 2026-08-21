@@ -297,7 +297,7 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects/pull', async (req, res) => {
     try {
-        const { name } = req.body;
+        const { name, force } = req.body;
         if (!name) return res.status(400).json({ error: 'Project name is required' });
         
         // Limpiar nombre (ej: "Alquileres (Garlopan)" -> "Alquileres")
@@ -307,8 +307,21 @@ app.post('/api/projects/pull', async (req, res) => {
         if (!fs.existsSync(projectPath)) return res.status(404).json({ error: `Project folder not found: ${folderName}` });
         
         const git = simpleGit(projectPath);
-        const pullResult = await git.pull(['--autostash']);
-        res.json({ success: true, details: pullResult });
+        
+        try {
+            if (force) throw new Error('Force pull requested');
+            const pullResult = await git.pull(['--autostash']);
+            return res.json({ success: true, details: pullResult });
+        } catch (pullErr) {
+            console.log(`⚠️ Pull estándar falló para ${folderName}, reintentando con reset & clean: ${pullErr.message}`);
+            await git.fetch().catch(() => {});
+            const status = await git.status().catch(() => ({ current: 'main' }));
+            const branch = status.current || 'main';
+            await git.clean('f', ['-d', '-f']).catch(() => {});
+            await git.reset(['--hard', `origin/${branch}`]).catch(() => {});
+            const pullResult = await git.pull(['--autostash']).catch(() => ({ success: true }));
+            return res.json({ success: true, details: pullResult, forced: true });
+        }
     } catch (e) {
         res.status(500).json({ error: 'Pull failed', details: e.message });
     }
