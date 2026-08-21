@@ -76,7 +76,8 @@ function renderProjects(projects) {
         'Vacaciones': 'fa-plane',
         'Viajes': 'fa-earth-americas',
         'Dashboard_Global': 'fa-gauge-high',
-        'Domotica': 'fa-house-laptop'
+        'Domotica': 'fa-house-laptop',
+        'conciertos': 'fa-ticket-simple'
     };
 
     projects.forEach(p => {

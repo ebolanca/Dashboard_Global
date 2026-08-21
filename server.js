@@ -247,14 +247,16 @@ app.get('/api/projects', async (req, res) => {
                         'Vacaciones': 'fa-plane',
                         'Viajes': 'fa-earth-americas',
                         'Dashboard_Global': 'fa-gauge-high',
-                        'Domotica': 'fa-house-laptop'
+                        'Domotica': 'fa-house-laptop',
+                    'conciertos': 'fa-ticket-simple'
                     };
                     
                     const urlsMap = {
                         'Horarios': 'https://horarios-rail.web.app',
                         'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
-                        'Domotica': 'https://github.com/ebolanca/Domotica'
+                        'Domotica': 'https://github.com/ebolanca/Domotica',
+                    'conciertos': 'http://100.95.217.45:8086'
                     };
 
                     let firebaseProjectId = f.toLowerCase();
