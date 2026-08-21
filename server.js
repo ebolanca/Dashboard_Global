@@ -40,7 +40,7 @@ app.get('/api/bots', (req, res) => {
                 return res.json([]);
             }
             const filtered = list
-                .filter(proc => proc.name !== 'dashboard-global' && proc.name !== 'domotica-explorer')
+                .filter(proc => proc.name !== 'dashboard-global' && proc.name !== 'dashboard-msi' && proc.name !== 'Sync_Futbol' && proc.name !== 'domotica-explorer')
                 .map(proc => ({
                     id: proc.pm_id,
                     name: proc.name,
