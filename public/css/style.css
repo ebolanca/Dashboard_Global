@@ -418,7 +418,7 @@ body {
     background: #0f172a;
     padding: 1.5rem;
     border-radius: 16px;
-    max-height: 400px;
+    min-height: 250px; max-height: 480px;
     overflow-y: auto;
 }
 
@@ -436,17 +436,17 @@ body {
 
 /* Estilos específicos para el modal de logs de bot */
 #bot-modal .modal-content {
-    max-width: 700px;
+    max-width: 850px;
     width: 90%;
 }
 
 .terminal-logs {
     margin: 0;
     font-family: 'JetBrains Mono', 'Consolas', 'Courier New', Courier, monospace;
-    font-size: 10px;
-    line-height: 1.0;
+    font-size: 0.88rem;
+    line-height: 1.5;
     letter-spacing: 0;
-    white-space: pre;
+    white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
     color: #cbd5e1;
     word-break: normal;
     overflow-x: auto;
