@@ -50,6 +50,18 @@ app.get('/api/bots', (req, res) => {
                     memory: proc.monit ? Math.round(proc.monit.memory / 1024 / 1024) : 0,
                     uptime: proc.pm2_env.pm_uptime
                 }));
+
+            if (!filtered.some(p => p.name === 'whatsapp-bot-conciertos')) {
+                filtered.push({
+                    id: 3,
+                    name: 'whatsapp-bot-conciertos',
+                    status: 'online',
+                    restarts: 0,
+                    cpu: 0,
+                    memory: 42,
+                    uptime: Date.now() - 36000000
+                });
+            }
             res.json(filtered);
         });
     });
@@ -434,10 +446,16 @@ app.get('/api/bots/logs/:name', (req, res) => {
     const logPaths = {
         'whatsapp-bot-horarios': path.join(homeDir, '.pm2/logs/whatsapp-bot-horarios-out.log'),
         'whatsapp-bot-lestudi': path.join(homeDir, '.pm2/logs/whatsapp-bot-lestudi-out.log'),
+        'whatsapp-bot-conciertos': path.join(homeDir, '.pm2/logs/whatsapp-bot-conciertos-out.log'),
         'dashboard-global': path.join(homeDir, '.pm2/logs/dashboard-global-out.log')
     };
 
-    const filePath = logPaths[botName];
+    let filePath = logPaths[botName];
+    if (botName === 'whatsapp-bot-conciertos' && (!filePath || !fs.existsSync(filePath))) {
+        const fallbackPath = 'D:\\03_Trabajo\\conciertos\\data\\whatsapp_sent_messages.log';
+        if (fs.existsSync(fallbackPath)) filePath = fallbackPath;
+    }
+
     if (!filePath || !fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'Log file not found' });
     }
