@@ -52,6 +52,7 @@ async function fetchData() {
             }
         }
         
+        finalBots = finalBots.filter(b => b.name !== 'paperless-ai-watcher');
         renderBots(finalBots);
         fetchPaperlessStats();
         
