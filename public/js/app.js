@@ -54,7 +54,13 @@ async function fetchData() {
         
         finalBots = finalBots.filter(b => b.name !== 'paperless-ai-watcher');
         renderBots(finalBots);
-        fetchPaperlessStats();
+        
+        if (config.pcName === 'MSI') {
+            const paperlessSec = document.getElementById('paperless-section');
+            if (paperlessSec) paperlessSec.style.display = 'none';
+        } else {
+            fetchPaperlessStats();
+        }
         
     } catch (error) {
         console.error('Error fetching data:', error);
