@@ -151,10 +151,34 @@ app.post('/api/paperless/restart', (req, res) => {
 
 app.post('/api/pm2/restart', (req, res) => {
     const processName = req.body.name || 'musica';
-    console.log(`🔄 Reiniciando proceso PM2 '${processName}'...`);
+    console.log(`🔄 Reiniciando/iniciando proceso PM2 '${processName}'...`);
     const { exec } = require('child_process');
     exec(`pm2 restart ${processName}`, (err, stdout, stderr) => {
         if (err) {
+            console.log(`⚠️ pm2 restart falló para ${processName}, intentando iniciar de cero...`);
+            const cwdMap = {
+                'musica': path.join(WORKSPACE_DIR, 'Musica'),
+                'Musica': path.join(WORKSPACE_DIR, 'Musica'),
+                'conciertos': path.join(WORKSPACE_DIR, 'conciertos'),
+                'Conciertos': path.join(WORKSPACE_DIR, 'conciertos')
+            };
+            const targetCwd = cwdMap[processName];
+            const scriptName = (processName.toLowerCase() === 'conciertos') ? 'main.py' : 'server.js';
+            const cmd = (processName.toLowerCase() === 'conciertos')
+                ? `pm2 start main.py --name ${processName} --interpreter python`
+                : `pm2 start server.js --name ${processName}`;
+
+            if (targetCwd && fs.existsSync(targetCwd)) {
+                exec(cmd, { cwd: targetCwd }, (err2, out2, errOut2) => {
+                    if (err2) {
+                        console.error(`Error al iniciar ${processName} con PM2:`, err2.message);
+                        return res.status(500).json({ error: err2.message, stderr: errOut2 });
+                    }
+                    console.log(`✅ Proceso ${processName} iniciado con éxito en PM2.`);
+                    return res.json({ success: true, started: true, stdout: out2 });
+                });
+                return;
+            }
             return res.status(500).json({ error: err.message, stderr });
         }
         res.json({ success: true, stdout });
