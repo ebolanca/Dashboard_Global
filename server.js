@@ -475,6 +475,13 @@ app.post('/api/projects/deploy', async (req, res) => {
         }
 
         res.json({ success: true });
+
+        if (folderName === 'Dashboard_Global') {
+            console.log('🔄 Reiniciando proceso PM2 del Dashboard Global...');
+            setTimeout(() => {
+                process.exit(0);
+            }, 500);
+        }
     } catch (e) {
         console.error('Error in process:', e);
         res.status(500).json({ error: 'Process failed', details: e.message });
