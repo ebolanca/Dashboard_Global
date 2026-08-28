@@ -186,26 +186,6 @@ app.get('/api/projects', async (req, res) => {
                 status = await git.status();
                 log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
                 lastCommit = log.latest ? log.latest.message : 'No commits';
-            } catch (gitErr) {
-                try {
-                    const { execSync } = require('child_process');
-                    execSync(`git config --global --add safe.directory "${projectPath.replace(/\\/g, '/')}"`);
-                    execSync(`git config --global --add safe.directory "*"`);
-                    const gitRetry = simpleGit(projectPath);
-                    status = await gitRetry.status();
-                    log = await gitRetry.log({ n: 1 }).catch(() => ({ latest: null }));
-                    lastCommit = log.latest ? log.latest.message : 'No commits';
-                } catch (retryErr) {
-                    console.error(`Error checking git for ${f}`, gitErr);
-                    return [{ 
-                        name: f, 
-                        url: urlsMap[f] || '#',
-                        icon: iconsMap[f] || 'fa-folder',
-                        error: 'Git error', 
-                        details: gitErr.message 
-                    }];
-                }
-            }
 
                 // Extracción de versión mejorada
                 let version = 'v?';
@@ -333,8 +313,11 @@ app.get('/api/projects', async (req, res) => {
                 }
             } catch (e) {
                 console.error(`Error checking git for ${f}`, e);
+                const displayNameMap = { 'conciertos': 'Conciertos' };
+                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music' };
+                const urlsMap = { 'conciertos': 'http://100.95.217.45:8086', 'Conciertos': 'http://100.95.217.45:8086', 'Musica': 'http://100.95.217.45:8087' };
                 return [{ 
-                    name: f, 
+                    name: displayNameMap[f] || f, 
                     url: urlsMap[f] || '#',
                     icon: iconsMap[f] || 'fa-folder',
                     error: 'Git error', 
