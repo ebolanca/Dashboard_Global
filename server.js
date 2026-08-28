@@ -169,6 +169,7 @@ app.get('/api/projects', async (req, res) => {
             
             try {
                 const git = simpleGit(projectPath);
+                await git.addConfig('safe.directory', '*', false, 'global').catch(() => {});
                 
                 // Fetch silencioso para actualizar estado remoto (máx 3s timeout)
                 await Promise.race([
@@ -300,7 +301,13 @@ app.get('/api/projects', async (req, res) => {
                 }
             } catch (e) {
                 console.error(`Error checking git for ${f}`, e);
-                return [{ name: f, error: 'Git error', details: e.message }];
+                return [{ 
+                    name: f, 
+                    url: urlsMap[f] || '#',
+                    icon: iconsMap[f] || 'fa-folder',
+                    error: 'Git error', 
+                    details: e.message 
+                }];
             }
         }));
 
