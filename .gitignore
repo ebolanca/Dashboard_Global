@@ -8,3 +8,5 @@ yarn-error.log*
 logs/
 dump.pm2
 config.json
+
+*.bat
