@@ -284,8 +284,8 @@ app.get('/api/projects', async (req, res) => {
                         'Domotica': 'https://github.com/ebolanca/Domotica',
                         'conciertos': 'http://100.95.217.45:8086',
                         'Conciertos': 'http://100.95.217.45:8086',
-                        'Musica': 'http://100.95.217.45:8087',
-                        'musica': 'http://100.95.217.45:8087'
+                        'Musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
+                        'musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087'
                     };
 
                     let firebaseProjectId = f.toLowerCase();
