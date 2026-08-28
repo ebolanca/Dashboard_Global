@@ -183,12 +183,6 @@ app.get('/api/projects', async (req, res) => {
                 const git = simpleGit(projectPath);
                 await git.addConfig('safe.directory', '*', false, 'global').catch(() => {});
                 
-                // Fetch silencioso para actualizar estado remoto (máx 3s timeout)
-                await Promise.race([
-                    git.fetch().catch(() => {}),
-                    new Promise(resolve => setTimeout(resolve, 3000))
-                ]);
-                
                 status = await git.status();
                 log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
                 lastCommit = log.latest ? log.latest.message : 'No commits';
