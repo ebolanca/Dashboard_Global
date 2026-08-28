@@ -260,7 +260,9 @@ app.get('/api/projects', async (req, res) => {
                         'Viajes': 'fa-earth-americas',
                         'Dashboard_Global': 'fa-gauge-high',
                         'Domotica': 'fa-house-laptop',
-                    'conciertos': 'fa-ticket-simple'
+                        'conciertos': 'fa-ticket-simple',
+                        'Musica': 'fa-music',
+                        'musica': 'fa-music'
                     };
                     
                     const urlsMap = {
@@ -268,7 +270,9 @@ app.get('/api/projects', async (req, res) => {
                         'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
                         'Domotica': 'https://github.com/ebolanca/Domotica',
-                    'conciertos': 'http://100.95.217.45:8086'
+                        'conciertos': 'http://100.95.217.45:8086',
+                        'Musica': 'http://100.95.217.45:8087',
+                        'musica': 'http://100.95.217.45:8087'
                     };
 
                     let firebaseProjectId = f.toLowerCase();
