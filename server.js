@@ -280,6 +280,10 @@ app.get('/api/projects', async (req, res) => {
                         }
                     ];
                 } else {
+                    const displayNameMap = {
+                        'conciertos': 'Conciertos'
+                    };
+
                     const iconsMap = {
                         'Horarios': 'fa-calendar-days',
                         'Pedidos': 'fa-box',
@@ -288,6 +292,7 @@ app.get('/api/projects', async (req, res) => {
                         'Dashboard_Global': 'fa-gauge-high',
                         'Domotica': 'fa-house-laptop',
                         'conciertos': 'fa-ticket-simple',
+                        'Conciertos': 'fa-ticket-simple',
                         'Musica': 'fa-music',
                         'musica': 'fa-music'
                     };
@@ -298,6 +303,7 @@ app.get('/api/projects', async (req, res) => {
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
                         'Domotica': 'https://github.com/ebolanca/Domotica',
                         'conciertos': 'http://100.95.217.45:8086',
+                        'Conciertos': 'http://100.95.217.45:8086',
                         'Musica': 'http://100.95.217.45:8087',
                         'musica': 'http://100.95.217.45:8087'
                     };
@@ -318,7 +324,7 @@ app.get('/api/projects', async (req, res) => {
                     const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
 
                     return [{
-                        name: f,
+                        name: displayNameMap[f] || f,
                         url: urlsMap[f] || '#',
                         consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
                         icon: iconsMap[f] || 'fa-folder',
