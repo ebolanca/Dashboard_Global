@@ -149,6 +149,18 @@ app.post('/api/paperless/restart', (req, res) => {
     });
 });
 
+app.post('/api/pm2/restart', (req, res) => {
+    const processName = req.body.name || 'musica';
+    console.log(`🔄 Reiniciando proceso PM2 '${processName}'...`);
+    const { exec } = require('child_process');
+    exec(`pm2 restart ${processName}`, (err, stdout, stderr) => {
+        if (err) {
+            return res.status(500).json({ error: err.message, stderr });
+        }
+        res.json({ success: true, stdout });
+    });
+});
+
 app.post('/api/dashboard/restart', (req, res) => {
     console.log('🔄 Aplicando safe.directory y reiniciando Dashboard Global...');
     const { exec } = require('child_process');
