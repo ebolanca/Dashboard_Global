@@ -149,6 +149,17 @@ app.post('/api/paperless/restart', (req, res) => {
     });
 });
 
+app.post('/api/dashboard/restart', (req, res) => {
+    console.log('🔄 Aplicando safe.directory y reiniciando Dashboard Global...');
+    const { exec } = require('child_process');
+    exec('git config --global --add safe.directory *', (err) => {
+        res.json({ success: true, err: err ? err.message : null });
+        setTimeout(() => {
+            exec('pm2 restart dashboard-global || pm2 restart dashboard-msi');
+        }, 500);
+    });
+});
+
 app.get('/api/projects', async (req, res) => {
     try {
         if (!fs.existsSync(WORKSPACE_DIR)) {
