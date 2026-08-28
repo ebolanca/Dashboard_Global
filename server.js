@@ -178,6 +178,7 @@ app.get('/api/projects', async (req, res) => {
                 return [];
             }
             
+            let status, log, lastCommit = 'No commits';
             try {
                 const git = simpleGit(projectPath);
                 await git.addConfig('safe.directory', '*', false, 'global').catch(() => {});
@@ -188,9 +189,29 @@ app.get('/api/projects', async (req, res) => {
                     new Promise(resolve => setTimeout(resolve, 3000))
                 ]);
                 
-                const status = await git.status();
-                const log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
-                const lastCommit = log.latest ? log.latest.message : 'No commits';
+                status = await git.status();
+                log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
+                lastCommit = log.latest ? log.latest.message : 'No commits';
+            } catch (gitErr) {
+                try {
+                    const { execSync } = require('child_process');
+                    execSync(`git config --global --add safe.directory "${projectPath.replace(/\\/g, '/')}"`);
+                    execSync(`git config --global --add safe.directory "*"`);
+                    const gitRetry = simpleGit(projectPath);
+                    status = await gitRetry.status();
+                    log = await gitRetry.log({ n: 1 }).catch(() => ({ latest: null }));
+                    lastCommit = log.latest ? log.latest.message : 'No commits';
+                } catch (retryErr) {
+                    console.error(`Error checking git for ${f}`, gitErr);
+                    return [{ 
+                        name: f, 
+                        url: urlsMap[f] || '#',
+                        icon: iconsMap[f] || 'fa-folder',
+                        error: 'Git error', 
+                        details: gitErr.message 
+                    }];
+                }
+            }
 
                 // Extracción de versión mejorada
                 let version = 'v?';
