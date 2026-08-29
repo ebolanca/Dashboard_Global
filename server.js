@@ -251,12 +251,22 @@ app.get('/api/projects', async (req, res) => {
                     }
                 }
                 
+                // Excluir bases de datos dinámicas/cachés (ej. data/ en Musica) del conteo de cambios locales
+                const relevantFiles = (status.files || []).filter(file => {
+                    const p = (file.path || '').replace(/\\/g, '/');
+                    if (f.toLowerCase() === 'musica' && p.startsWith('data/')) return false;
+                    return true;
+                });
+
+                const localChangesCount = relevantFiles.length;
+                const isClean = localChangesCount === 0;
+
                 const baseInfo = {
                     branch: status.current,
                     behind: status.behind,
                     ahead: status.ahead,
-                    localChanges: status.files.length,
-                    isClean: status.isClean(),
+                    localChanges: localChangesCount,
+                    isClean: isClean,
                     lastCommit: lastCommit,
                     version: version,
                     githubUrl: `https://github.com/ebolanca/${f}`
