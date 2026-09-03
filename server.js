@@ -228,7 +228,7 @@ app.get('/api/projects', async (req, res) => {
             const projectPath = path.join(WORKSPACE_DIR, f);
             const gitPath = path.join(projectPath, '.git');
             
-            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || !fs.existsSync(gitPath)) {
+            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || f.toLowerCase() === 'spam_cleaner' || !fs.existsSync(gitPath)) {
                 return [];
             }
             
@@ -272,7 +272,7 @@ app.get('/api/projects', async (req, res) => {
                 // Excluir bases de datos dinámicas/cachés (ej. data/ en Musica) del conteo de cambios locales
                 const relevantFiles = (status.files || []).filter(file => {
                     const p = (file.path || '').replace(/\\/g, '/');
-                    if (f.toLowerCase() === 'musica' && p.startsWith('data/')) return false;
+                    if (f.toLowerCase() === 'musica' && (p.startsWith('data/') || p.includes('lyrics_') || p.includes('metadata_cache'))) return false;
                     return true;
                 });
 
