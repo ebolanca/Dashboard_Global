@@ -149,6 +149,24 @@ app.post('/api/paperless/restart', (req, res) => {
     });
 });
 
+app.get('/api/docker/logs', (req, res) => {
+    const container = req.query.name || 'spotdl-sync';
+    const lines = req.query.lines || 30;
+    const { exec } = require('child_process');
+    exec('docker logs --tail ' + lines + ' ' + container, (err, stdout, stderr) => {
+        res.json({ output: stdout || stderr || '' });
+    });
+});
+
+app.post('/api/docker/restart', (req, res) => {
+    const container = req.body.name || 'spotdl-sync';
+    const { exec } = require('child_process');
+    exec('docker restart ' + container, (err, stdout, stderr) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, stdout });
+    });
+});
+
 app.post('/api/pm2/restart', (req, res) => {
     const processName = req.body.name || 'musica';
     console.log(`🔄 Reiniciando/iniciando proceso PM2 '${processName}'...`);
