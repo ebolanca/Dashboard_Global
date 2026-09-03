@@ -52,7 +52,16 @@ async function fetchData() {
             }
         }
         
-        finalBots = finalBots.filter(b => b.name !== 'paperless-ai-watcher');
+        // Deduplicar bots por nombre único
+        const uniqueBots = [];
+        const seenBotNames = new Set();
+        for (const b of finalBots) {
+            if (!seenBotNames.has(b.name)) {
+                seenBotNames.add(b.name);
+                uniqueBots.push(b);
+            }
+        }
+        finalBots = uniqueBots.filter(b => b.name !== 'paperless-ai-watcher');
         renderBots(finalBots);
         
         if (config.pcName === 'MSI') {

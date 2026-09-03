@@ -51,7 +51,7 @@ app.get('/api/bots', (req, res) => {
                     uptime: proc.pm2_env.pm_uptime
                 }));
 
-            if (!filtered.some(p => p.name === 'whatsapp-bot-conciertos')) {
+            if (!IS_MSI && !filtered.some(p => p.name === 'whatsapp-bot-conciertos')) {
                 filtered.push({
                     id: 3,
                     name: 'whatsapp-bot-conciertos',
