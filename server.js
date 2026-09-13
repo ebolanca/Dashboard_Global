@@ -27,6 +27,25 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+app.get('/api/pm2/all', (req, res) => {
+    pm2.connect((err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        pm2.list((err, list) => {
+            pm2.disconnect();
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(list.map(p => ({
+                id: p.pm_id,
+                name: p.name,
+                status: p.pm2_env.status,
+                restarts: p.pm2_env.restart_time,
+                pm_cwd: p.pm2_env.pm_cwd,
+                pm_exec_path: p.pm2_env.pm_exec_path,
+                node_args: p.pm2_env.node_args
+            })));
+        });
+    });
+});
+
 app.get('/api/bots', (req, res) => {
     // Si estamos en el MSI, no tenemos pm2 con estos bots, pero el frontend consultará al OMEN directamente.
     // Aun así, intentamos listar por si acaso hay algo local.
@@ -164,6 +183,36 @@ app.post('/api/docker/restart', (req, res) => {
     exec('docker restart ' + container, (err, stdout, stderr) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true, stdout });
+    });
+});
+
+app.get('/api/diag', (req, res) => {
+    const { exec } = require('child_process');
+    exec('node -e "console.log(process.memoryUsage())"', (err, stdout) => {
+        res.json({ err: err ? err.message : null, stdout });
+    });
+});
+
+app.get('/api/pm2/log-tail', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const errPath = path.join(os.homedir(), '.pm2/logs/musica-error.log');
+    const outPath = path.join(os.homedir(), '.pm2/logs/musica-out.log');
+    let errLog = '', outLog = '';
+    try { if (fs.existsSync(errPath)) errLog = fs.readFileSync(errPath, 'utf8').slice(-3000); } catch(e){}
+    try { if (fs.existsSync(outPath)) outLog = fs.readFileSync(outPath, 'utf8').slice(-3000); } catch(e){}
+    res.json({ errLog, outLog });
+});
+
+app.post('/api/pm2/recreate', (req, res) => {
+    const { exec } = require('child_process');
+    const targetCwd = path.join(WORKSPACE_DIR, 'Musica');
+    exec('pm2 delete musica', () => {
+        exec('pm2 start server.js --name musica', { cwd: targetCwd }, (err, stdout, stderr) => {
+            if (err) return res.status(500).json({ error: err.message, stderr });
+            res.json({ success: true, stdout });
+        });
     });
 });
 
@@ -537,7 +586,9 @@ app.get('/api/bots/logs/:name', (req, res) => {
         'whatsapp-bot-horarios': path.join(homeDir, '.pm2/logs/whatsapp-bot-horarios-out.log'),
         'whatsapp-bot-lestudi': path.join(homeDir, '.pm2/logs/whatsapp-bot-lestudi-out.log'),
         'whatsapp-bot-conciertos': path.join(homeDir, '.pm2/logs/whatsapp-bot-conciertos-out.log'),
-        'dashboard-global': path.join(homeDir, '.pm2/logs/dashboard-global-out.log')
+        'dashboard-global': path.join(homeDir, '.pm2/logs/dashboard-global-out.log'),
+        'musica': path.join(homeDir, '.pm2/logs/musica-out.log'),
+        'musica-error': path.join(homeDir, '.pm2/logs/musica-error.log')
     };
 
     let filePath = logPaths[botName];
