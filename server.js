@@ -603,10 +603,17 @@ app.get('/api/bots/logs/:name', (req, res) => {
 
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        let lines = content.trim().split('\n');
-        
-        // Buscamos la última aparición del código QR en los logs para mostrar a partir de ahí
-        // y evitar acumulados de códigos QR viejos y ya expirados.
+        const allLines = content.trim().split('\n');
+
+        // Partimos siempre de la actividad reciente (últimas 150 líneas), no de todo el
+        // historial del fichero.
+        let lines = allLines.slice(-150);
+
+        // Si dentro de ESA ventana reciente hay un código QR pendiente de escanear, lo
+        // priorizamos (para que se vea el QR actual y no se pierda entre mensajes).
+        // Antes se buscaba el QR en TODO el fichero, así que un bot que hace tiempo dejó
+        // de usar QR (p.ej. tras migrar a la API oficial de Meta) se quedaba mostrando
+        // para siempre ese QR antiguo y expirado en vez de la actividad real reciente.
         const qrMarkers = ["Escanea el QR", "SCAN QR CODE"];
         let lastQrIndex = -1;
         for (let i = lines.length - 1; i >= 0; i--) {
@@ -615,15 +622,11 @@ app.get('/api/bots/logs/:name', (req, res) => {
                 break;
             }
         }
-        
+
         if (lastQrIndex !== -1) {
-            // Devolvemos desde la última aparición del QR (siempre que el QR no sea extremadamente viejo)
             lines = lines.slice(lastQrIndex);
-        } else {
-            // Si no hay QR, enviamos las últimas 100 líneas
-            lines = lines.slice(-100);
         }
-        
+
         res.json({ logs: lines });
     } catch (e) {
         res.status(500).json({ error: 'Error reading logs', details: e.message });
