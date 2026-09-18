@@ -635,6 +635,7 @@ app.get('/api/bots/logs/:name', (req, res) => {
 
 // --- API CONTROL DOCKER ---
 const { execFile } = require('child_process');
+const http = require('http');
 
 app.get('/api/docker/status', (req, res) => {
     execFile('docker.exe', ['ps', '-a', '--format', '{{.Names}}::{{.State}}'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
@@ -650,7 +651,26 @@ app.get('/api/docker/status', (req, res) => {
                 containers[parts[0].trim()] = parts[1].trim();
             }
         });
-        res.json(containers);
+
+        // Soporte AdGuard Home (Servicio Windows / PM2 en puerto 8084)
+        let answered = false;
+        const sendStatus = (state) => {
+            if (answered) return;
+            answered = true;
+            containers['adguard-home'] = state;
+            res.json(containers);
+        };
+
+        const checkAdguard = http.get('http://127.0.0.1:8084', { timeout: 1000 }, () => {
+            sendStatus('running');
+        });
+        checkAdguard.on('error', () => {
+            sendStatus('exited');
+        });
+        checkAdguard.on('timeout', () => {
+            checkAdguard.destroy();
+            sendStatus('exited');
+        });
     });
 });
 
@@ -660,6 +680,30 @@ app.post('/api/docker/toggle', (req, res) => {
     
     if (!/^[a-zA-Z0-9_-]+$/.test(container)) {
         return res.status(400).json({ error: 'Invalid container name format' });
+    }
+
+    // Caso especial: AdGuard Home administrado por PM2 en Windows
+    if (container === 'adguard-home') {
+        let answeredToggle = false;
+        const doToggle = (action) => {
+            if (answeredToggle) return;
+            answeredToggle = true;
+            console.log(`🛡️ ${action === 'stop' ? 'Deteniendo' : 'Iniciando'} AdGuard Home en PM2...`);
+            execFile('cmd.exe', ['/c', `pm2 ${action} adguard-home`], { timeout: 10000, windowsHide: true }, (actionErr) => {
+                if (actionErr) {
+                    return res.status(500).json({ error: `Failed to ${action} adguard-home`, details: actionErr.message });
+                }
+                res.json({ success: true, container, action, running: action === 'start' });
+            });
+        };
+
+        const checkReq = http.get('http://127.0.0.1:8084', { timeout: 1000 }, () => doToggle('stop'));
+        checkReq.on('error', () => doToggle('start'));
+        checkReq.on('timeout', () => {
+            checkReq.destroy();
+            doToggle('start');
+        });
+        return;
     }
 
     execFile('docker.exe', ['inspect', '--format={{.State.Running}}', container], { timeout: 5000, windowsHide: true }, (err, stdout) => {
