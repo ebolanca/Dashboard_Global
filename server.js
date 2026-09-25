@@ -227,7 +227,9 @@ app.post('/api/pm2/restart', (req, res) => {
                 'musica': path.join(WORKSPACE_DIR, 'Musica'),
                 'Musica': path.join(WORKSPACE_DIR, 'Musica'),
                 'conciertos': path.join(WORKSPACE_DIR, 'conciertos'),
-                'Conciertos': path.join(WORKSPACE_DIR, 'conciertos')
+                'Conciertos': path.join(WORKSPACE_DIR, 'conciertos'),
+                'subastas': path.join(WORKSPACE_DIR, 'Subastas'),
+                'Subastas': path.join(WORKSPACE_DIR, 'Subastas')
             };
             const targetCwd = cwdMap[processName];
             const scriptName = (processName.toLowerCase() === 'conciertos') ? 'main.py' : 'server.js';
@@ -728,6 +730,38 @@ app.post('/api/docker/toggle', (req, res) => {
         });
     });
 });
+
+// Auto-fetch periódico de repositorios en segundo plano para detectar cambios remotos (behind/ahead) automáticamente
+let isFetchingRemotes = false;
+async function fetchAllGitRepositories() {
+    if (isFetchingRemotes || !fs.existsSync(WORKSPACE_DIR)) return;
+    isFetchingRemotes = true;
+    try {
+        const entries = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const folder = entry.name;
+            if (folder === 'vikey-proxy' || folder === 'node_modules' || folder === '.git') continue;
+            const gitDir = path.join(WORKSPACE_DIR, folder, '.git');
+            if (fs.existsSync(gitDir)) {
+                try {
+                    const git = simpleGit(path.join(WORKSPACE_DIR, folder));
+                    await git.fetch().catch(() => {});
+                } catch (e) {
+                    // ignorar fallos temporales de red
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error en fetchAllGitRepositories:', err.message);
+    } finally {
+        isFetchingRemotes = false;
+    }
+}
+
+// Iniciar auto-fetch 5 segundos tras el arranque y repetir cada 60 segundos
+setTimeout(fetchAllGitRepositories, 5000);
+setInterval(fetchAllGitRepositories, 60000);
 
 const PORT = 4000;
 app.listen(PORT, '0.0.0.0', () => {
