@@ -374,7 +374,8 @@ app.get('/api/projects', async (req, res) => {
                     ];
                 } else {
                     const displayNameMap = {
-                        'conciertos': 'Conciertos'
+                        'conciertos': 'Conciertos',
+                        'subastas': 'Subastas'
                     };
 
                     const iconsMap = {
@@ -387,7 +388,9 @@ app.get('/api/projects', async (req, res) => {
                         'conciertos': 'fa-ticket-simple',
                         'Conciertos': 'fa-ticket-simple',
                         'Musica': 'fa-music',
-                        'musica': 'fa-music'
+                        'musica': 'fa-music',
+                        'Subastas': 'fa-gavel',
+                        'subastas': 'fa-gavel'
                     };
                     
                     const urlsMap = {
@@ -398,7 +401,9 @@ app.get('/api/projects', async (req, res) => {
                         'conciertos': 'http://100.95.217.45:8086',
                         'Conciertos': 'http://100.95.217.45:8086',
                         'Musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
-                        'musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087'
+                        'musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
+                        'Subastas': 'http://100.95.217.45:4005/',
+                        'subastas': 'http://100.95.217.45:4005/'
                     };
 
                     let firebaseProjectId = f.toLowerCase();
@@ -426,9 +431,9 @@ app.get('/api/projects', async (req, res) => {
                 }
             } catch (e) {
                 console.error(`Error checking git for ${f}`, e);
-                const displayNameMap = { 'conciertos': 'Conciertos' };
-                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music' };
-                const urlsMap = { 'conciertos': 'http://100.95.217.45:8086', 'Conciertos': 'http://100.95.217.45:8086', 'Musica': 'http://100.95.217.45:8087' };
+                const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
+                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel' };
+                const urlsMap = { 'conciertos': 'http://100.95.217.45:8086', 'Conciertos': 'http://100.95.217.45:8086', 'Musica': 'http://100.95.217.45:8087', 'Subastas': 'http://100.95.217.45:4005/', 'subastas': 'http://100.95.217.45:4005/' };
                 return [{ 
                     name: displayNameMap[f] || f, 
                     url: urlsMap[f] || '#',

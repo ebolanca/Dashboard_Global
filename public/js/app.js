@@ -93,7 +93,9 @@ function renderProjects(projects) {
         'Viajes': 'fa-earth-americas',
         'Dashboard_Global': 'fa-gauge-high',
         'Domotica': 'fa-house-laptop',
-        'conciertos': 'fa-ticket-simple'
+        'conciertos': 'fa-ticket-simple',
+        'Subastas': 'fa-gavel',
+        'subastas': 'fa-gavel'
     };
 
     projects.forEach(p => {
