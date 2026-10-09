@@ -399,19 +399,22 @@ app.get('/api/projects', async (req, res) => {
                         'drop': 'fa-paperclip'
                     };
                     
+                    const localBase = (port) => IS_MSI ? `http://localhost:${port}` : `http://${REMOTE_SERVER_IP}:${port}`;
+
                     const urlsMap = {
                         'Horarios': 'https://horarios-rail.web.app',
                         'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
                         'Domotica': 'https://github.com/ebolanca/Domotica',
-                        'conciertos': 'http://100.95.217.45:8086',
-                        'Conciertos': 'http://100.95.217.45:8086',
-                        'Musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
-                        'musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
-                        'Subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/',
-                        'subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/',
-                        'Drop': 'http://100.95.217.45:5050',
-                        'drop': 'http://100.95.217.45:5050'
+                        'conciertos': localBase(8086),
+                        'Conciertos': localBase(8086),
+                        'Musica': localBase(8087),
+                        'musica': localBase(8087),
+                        'Subastas': localBase(4005) + '/',
+                        'subastas': localBase(4005) + '/',
+                        'Drop': localBase(5050),
+                        'drop': localBase(5050),
+                        'Dashboard_Global': localBase(4000)
                     };
 
                     let firebaseProjectId = f.toLowerCase();
@@ -439,9 +442,19 @@ app.get('/api/projects', async (req, res) => {
                 }
             } catch (e) {
                 console.error(`Error checking git for ${f}`, e);
+                const localBase = (port) => IS_MSI ? `http://localhost:${port}` : `http://${REMOTE_SERVER_IP}:${port}`;
                 const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
-                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel' };
-                const urlsMap = { 'conciertos': 'http://100.95.217.45:8086', 'Conciertos': 'http://100.95.217.45:8086', 'Musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087', 'Subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/', 'subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/' };
+                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip' };
+                const urlsMap = { 
+                    'conciertos': localBase(8086), 
+                    'Conciertos': localBase(8086), 
+                    'Musica': localBase(8087), 
+                    'Subastas': localBase(4005) + '/', 
+                    'subastas': localBase(4005) + '/',
+                    'Drop': localBase(5050),
+                    'drop': localBase(5050),
+                    'Dashboard_Global': localBase(4000)
+                };
                 return [{ 
                     name: displayNameMap[f] || f, 
                     url: urlsMap[f] || '#',
