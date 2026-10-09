@@ -405,7 +405,8 @@ app.get('/api/projects', async (req, res) => {
                         'Horarios': 'https://horarios-rail.web.app',
                         'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
-                        'Domotica': 'https://github.com/ebolanca/Domotica',
+                        'Domotica': 'http://100.95.217.45:8123',
+                        'domotica': 'http://100.95.217.45:8123',
                         'conciertos': localBase(8086),
                         'Conciertos': localBase(8086),
                         'Musica': localBase(8087),
@@ -453,6 +454,8 @@ app.get('/api/projects', async (req, res) => {
                     'subastas': localBase(4005) + '/',
                     'Drop': localBase(5050),
                     'drop': localBase(5050),
+                    'Domotica': 'http://100.95.217.45:8123',
+                    'domotica': 'http://100.95.217.45:8123',
                     'Dashboard_Global': localBase(4000)
                 };
                 return [{ 
