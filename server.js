@@ -229,7 +229,9 @@ app.post('/api/pm2/restart', (req, res) => {
                 'conciertos': path.join(WORKSPACE_DIR, 'conciertos'),
                 'Conciertos': path.join(WORKSPACE_DIR, 'conciertos'),
                 'subastas': path.join(WORKSPACE_DIR, 'Subastas'),
-                'Subastas': path.join(WORKSPACE_DIR, 'Subastas')
+                'Subastas': path.join(WORKSPACE_DIR, 'Subastas'),
+                'drop': path.join(WORKSPACE_DIR, 'Drop'),
+                'Drop': path.join(WORKSPACE_DIR, 'Drop')
             };
             const targetCwd = cwdMap[processName];
             const scriptName = (processName.toLowerCase() === 'conciertos') ? 'main.py' : 'server.js';
