@@ -394,7 +394,9 @@ app.get('/api/projects', async (req, res) => {
                         'Musica': 'fa-music',
                         'musica': 'fa-music',
                         'Subastas': 'fa-gavel',
-                        'subastas': 'fa-gavel'
+                        'subastas': 'fa-gavel',
+                        'Drop': 'fa-paperclip',
+                        'drop': 'fa-paperclip'
                     };
                     
                     const urlsMap = {
@@ -407,7 +409,9 @@ app.get('/api/projects', async (req, res) => {
                         'Musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
                         'musica': IS_MSI ? 'http://localhost:8087' : 'http://100.95.217.45:8087',
                         'Subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/',
-                        'subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/'
+                        'subastas': IS_MSI ? 'http://localhost:4005/' : 'http://100.95.217.45:4005/',
+                        'Drop': 'http://100.95.217.45:5050',
+                        'drop': 'http://100.95.217.45:5050'
                     };
 
                     let firebaseProjectId = f.toLowerCase();

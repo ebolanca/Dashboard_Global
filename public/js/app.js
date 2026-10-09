@@ -95,7 +95,9 @@ function renderProjects(projects) {
         'Domotica': 'fa-house-laptop',
         'conciertos': 'fa-ticket-simple',
         'Subastas': 'fa-gavel',
-        'subastas': 'fa-gavel'
+        'subastas': 'fa-gavel',
+        'Drop': 'fa-paperclip',
+        'drop': 'fa-paperclip'
     };
 
     projects.forEach(p => {
