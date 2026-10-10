@@ -104,53 +104,8 @@ let paperlessCache = {
     lastProcessedTime: '16/08/2026 18:42:15'
 };
 
-async function refreshPaperlessStatsAsync() {
-    try {
-        const pyCode = 'import json; from documents.models import Document, Tag, Correspondent, DocumentType; from django.utils import timezone; t = Document.objects.count(); tg = Document.objects.filter(tags__isnull=False).distinct().count(); c = Document.objects.filter(correspondent__isnull=False).count(); dt = Document.objects.filter(document_type__isnull=False).count(); l = Document.objects.filter(tags__isnull=False).order_by("-modified").first(); mod_time = timezone.template_localtime(l.modified).strftime("%d/%m/%Y %H:%M:%S") if l and l.modified else ""; print("JSON_START" + json.dumps({"total": t, "tagged": tg, "corr": c, "dtype": dt, "tagsCount": Tag.objects.count(), "corrsCount": Correspondent.objects.count(), "dtypesCount": DocumentType.objects.count(), "latestTitle": l.title if l else "Ninguno", "latestTime": mod_time}) + "JSON_END")';
-
-        const stdout = await new Promise((resolve) => {
-            execFile('docker.exe', ['exec', 'paperless-webserver', 'python3', 'manage.py', 'shell', '-c', pyCode], { timeout: 35000, windowsHide: true }, (err, out) => {
-                if (err) return resolve('');
-                resolve(out || '');
-            });
-        });
-
-        const match = stdout.match(/JSON_START(.*?)JSON_END/s);
-        if (match && match[1]) {
-            const stats = JSON.parse(match[1]);
-            if (stats && stats.total > 0) {
-                const total = stats.total;
-                const tagged = stats.tagged;
-                const correspondent = stats.corr;
-                const docType = stats.dtype;
-
-                paperlessCache = {
-                    status: 'active',
-                    statusText: 'Trabajando ⚡',
-                    statusClass: 'status-online',
-                    activeDocs: total,
-                    taggedDocs: tagged,
-                    taggedPercent: Math.round((tagged / total) * 1000) / 10,
-                    correspondentDocs: correspondent,
-                    correspondentPercent: Math.round((correspondent / total) * 1000) / 10,
-                    docTypeDocs: docType,
-                    docTypePercent: Math.round((docType / total) * 1000) / 10,
-                    tagsCount: stats.tagsCount || 2392,
-                    correspondentsCount: stats.corrsCount || 647,
-                    docTypesCount: stats.dtypesCount || 521,
-                    lastProcessedTitle: stats.latestTitle || 'Ninguno',
-                    lastProcessedTime: stats.latestTime || ''
-                };
-            }
-        }
-    } catch (e) {
-        console.error('Error background updating paperless stats:', e.message);
-    }
-}
-
-// Iniciar ciclo de actualización en segundo plano
-setInterval(refreshPaperlessStatsAsync, 30000);
-setTimeout(refreshPaperlessStatsAsync, 2000);
+// Actualización de estadísticas desactivada: Paperless ya está al 100% y no requiere sondeo constante por shell
+// async function refreshPaperlessStatsAsync() ...
 
 app.get('/api/paperless/stats', (req, res) => {
     res.json(paperlessCache);
