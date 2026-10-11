@@ -267,10 +267,10 @@ app.get('/api/projects', async (req, res) => {
                         let found = false;
                         for(let line of lines) {
                             if (line.trim().startsWith('//')) continue;
-                            const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["'](\d+\.\d+)["']/) || 
-                                            line.match(/version:\s*["'](\d+\.\d+)["']/);
+                            const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/) || 
+                                            line.match(/version:\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/);
                             if (jsMatch) { version = `v${jsMatch[2]}`; found = true; break; }
-                            const pkgMatch = line.match(/"version":\s*"(\d+\.\d+\.\d+)"/);
+                            const pkgMatch = line.match(/"version":\s*"(\d+\.\d+(?:\.\d+)?)"/);
                             if (pkgMatch) { version = `v${pkgMatch[1]}`; found = true; break; }
                         }
                         if (found) break;
@@ -305,9 +305,9 @@ app.get('/api/projects', async (req, res) => {
                         const htmlPath = path.join(projectPath, subDir, 'index.html');
                         if (fs.existsSync(htmlPath)) {
                             const content = fs.readFileSync(htmlPath, 'utf8');
-                            const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+)[^<]*<\/title>/i);
+                            const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+(?:\.\d+)?)[^<]*<\/title>/i);
                             if (titleMatch) return `v${titleMatch[1]}`;
-                            const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/i);
+                            const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"]v?(\d+\.\d+(?:\.\d+)?)['"]/i);
                             if (appVersionMatch) return `v${appVersionMatch[1]}`;
                         }
                         return 'v?';
@@ -523,6 +523,29 @@ app.post('/api/projects/deploy', async (req, res) => {
         // 1. Sincronizar versión (si el script existe)
         if (fs.existsSync(path.join(targetPath, 'scripts/sync_version.js'))) {
             execSync(`node scripts/sync_version.js ${version}`, { cwd: targetPath });
+        } else {
+            const pkgP = path.join(targetPath, 'package.json');
+            if (fs.existsSync(pkgP)) {
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(pkgP, 'utf8'));
+                    pkg.version = version.replace(/^v/, '');
+                    fs.writeFileSync(pkgP, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+                    console.log(`✅ package.json de ${folderName} actualizado a v${pkg.version}`);
+                } catch(e) {
+                    console.warn(`No se pudo actualizar package.json en ${folderName}:`, e.message);
+                }
+            }
+            const mfP = path.join(targetPath, 'manifest.json');
+            if (fs.existsSync(mfP)) {
+                try {
+                    const mf = JSON.parse(fs.readFileSync(mfP, 'utf8'));
+                    mf.version = version.replace(/^v/, '');
+                    fs.writeFileSync(mfP, JSON.stringify(mf, null, 2) + '\n', 'utf8');
+                    console.log(`✅ manifest.json de ${folderName} actualizado a v${mf.version}`);
+                } catch(e) {
+                    console.warn(`No se pudo actualizar manifest.json en ${folderName}:`, e.message);
+                }
+            }
         }
         
         // 2. Desplegar en Firebase (solo si está configurado)

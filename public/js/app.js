@@ -531,10 +531,37 @@ window.showBotLogs = async (name) => {
     logInterval = setInterval(fetchLogs, 5000);
 };
 
+function calculateNextVersion(current) {
+    if (!current) return '1.0.0';
+    const clean = current.replace(/^v/, '').trim();
+    const parts = clean.split('.').map(Number);
+    if (parts.length === 3) {
+        let [major, minor, patch] = parts;
+        if (isNaN(major) || isNaN(minor) || isNaN(patch)) return '1.0.0';
+        if (minor > 9) return (major + 1) + '.0.0';
+        if (patch > 9) return major + '.' + (minor + 1) + '.0';
+        patch += 1;
+        if (patch > 9) {
+            patch = 0;
+            minor += 1;
+            if (minor > 9) {
+                minor = 0;
+                major += 1;
+            }
+        }
+        return `${major}.${minor}.${patch}`;
+    } else if (parts.length === 2) {
+        let [major, minor] = parts;
+        if (isNaN(major) || isNaN(minor)) return '1.0.0';
+        return `${major + 1}.0.0`;
+    }
+    return '1.0.0';
+}
+
 window.openDeployModal = (e, name, currentVersion) => {
     if (e) e.stopPropagation();
     document.getElementById('modal-project-name').innerText = name;
-    document.getElementById('deploy-version').value = (currentVersion || '1.0.0').replace('v', '');
+    document.getElementById('deploy-version').value = calculateNextVersion(currentVersion);
     document.getElementById('deploy-summary').value = '';
     document.getElementById('deploy-modal').style.display = 'flex';
     
