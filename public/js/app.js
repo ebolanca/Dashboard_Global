@@ -1,4 +1,5 @@
 let config = {};
+let isInitialLoading = true;
 let allProjects = [];
 let allBots = [];
 let currentFilter = 'all';
@@ -142,13 +143,31 @@ async function fetchData() {
         }
         allBots = uniqueBots.filter(b => b.name !== 'paperless-ai-watcher');
 
+        isInitialLoading = false;
         applyFiltersAndRender();
     } catch (error) {
         console.error('Error fetching data:', error);
+        isInitialLoading = false;
+        applyFiltersAndRender();
     }
 }
 
 function applyFiltersAndRender() {
+    const loadingState = document.getElementById('loading-state');
+    const emptyState = document.getElementById('empty-state');
+    const secProjects = document.getElementById('section-projects');
+    const secBots = document.getElementById('section-bots');
+
+    if (isInitialLoading) {
+        if (loadingState) loadingState.style.display = 'flex';
+        if (emptyState) emptyState.style.display = 'none';
+        if (secProjects) secProjects.style.display = 'none';
+        if (secBots) secBots.style.display = 'none';
+        return;
+    } else {
+        if (loadingState) loadingState.style.display = 'none';
+    }
+
     // 1. Calcular pendientes
     const pendingProjects = allProjects.filter(p => (p.localChanges > 0 || p.behind > 0 || p.ahead > 0 || p.error));
     const pendingBots = allBots.filter(b => b.status !== 'online');
@@ -558,14 +577,32 @@ function calculateNextVersion(current) {
     return '1.0.0';
 }
 
-window.openDeployModal = (e, name, currentVersion) => {
+window.openDeployModal = async (e, name, currentVersion) => {
     if (e) e.stopPropagation();
     document.getElementById('modal-project-name').innerText = name;
     document.getElementById('deploy-version').value = calculateNextVersion(currentVersion);
-    document.getElementById('deploy-summary').value = '';
-    document.getElementById('deploy-modal').style.display = 'flex';
     
+    const summaryInput = document.getElementById('deploy-summary');
+    const hintEl = document.getElementById('deploy-summary-hint');
+    summaryInput.value = 'Detectando cambios locales automáticamente...';
+    summaryInput.disabled = true;
+    if (hintEl) hintEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo Git...';
+    
+    document.getElementById('deploy-modal').style.display = 'flex';
     document.getElementById('btn-confirm-deploy').onclick = () => window.confirmDeploy(name);
+
+    try {
+        const res = await fetch(`/api/projects/changes-summary?name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+        summaryInput.value = data.summary || 'Actualización y cambios locales';
+        if (hintEl) hintEl.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detectado';
+    } catch (err) {
+        summaryInput.value = 'Actualización y cambios locales';
+        if (hintEl) hintEl.innerHTML = '<i class="fa-solid fa-pen"></i> Manual';
+    } finally {
+        summaryInput.disabled = false;
+        summaryInput.focus();
+    }
 };
 
 window.closeModal = () => {

@@ -73,6 +73,14 @@
     </header>
 
     <main class="container">
+        <!-- Estado de Carga Inicial -->
+        <div id="loading-state" class="loading-state">
+            <div class="loading-spinner-box">
+                <div class="spinner"></div>
+            </div>
+            <h3>Cargando proyectos y servicios...</h3>
+            <p>Consultando repositorios locales y estado de servicios en el sistema</p>
+        </div>
         <!-- Estado Vacío cuando se filtra -->
         <div id="empty-state" class="empty-state" style="display: none;">
             <div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div>
@@ -125,7 +133,7 @@
                     <input type="text" id="deploy-version" placeholder="X.X.X">
                 </div>
                 <div class="form-group">
-                    <label><i class="fa-solid fa-pen-to-square"></i> Resumen de cambios (en español)</label>
+                    <label style="display:flex; justify-content:space-between; align-items:center;"><span><i class="fa-solid fa-pen-to-square"></i> Resumen de cambios (en español)</span><span class="auto-hint" id="deploy-summary-hint"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detectado</span></label>
                     <textarea id="deploy-summary" rows="3" placeholder="¿Qué has cambiado?"></textarea>
                 </div>
             </div>

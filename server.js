@@ -500,6 +500,123 @@ app.post('/api/projects/pull-all', async (req, res) => {
     }
 });
 
+function generateChangesSummary(targetPath) {
+    try {
+        const { execSync } = require('child_process');
+        let aheadCommits = [];
+        try {
+            const cherry = execSync('git log origin/main..HEAD --oneline', { cwd: targetPath, encoding: 'utf8', timeout: 5000 }).trim();
+            if (cherry) {
+                aheadCommits = cherry.split('\n').map(l => l.replace(/^[a-f0-9]+\s+/, '').trim()).filter(Boolean);
+            }
+        } catch (e) {}
+
+        let porcelain = '';
+        try {
+            porcelain = execSync('git status --porcelain', { cwd: targetPath, encoding: 'utf8', timeout: 5000 }).trim();
+        } catch (e) {}
+
+        const statusLines = porcelain ? porcelain.split('\n').map(l => l.trim()).filter(Boolean) : [];
+        const modifiedFiles = [];
+        const addedFiles = [];
+        const deletedFiles = [];
+
+        for (const line of statusLines) {
+            const status = line.substring(0, 2).trim();
+            const file = line.substring(2).trim();
+            if (file.toLowerCase().includes('data/') || file.includes('metadata_cache') || file.includes('lyrics_')) continue;
+            
+            if (status.includes('M')) modifiedFiles.push(file);
+            else if (status.includes('?') || status.includes('A')) addedFiles.push(file);
+            else if (status.includes('D')) deletedFiles.push(file);
+            else modifiedFiles.push(file);
+        }
+
+        const allTouchedFiles = [...modifiedFiles, ...addedFiles, ...deletedFiles];
+
+        // 1. Sin cambios locales ni commits pendientes
+        if (allTouchedFiles.length === 0 && aheadCommits.length === 0) {
+            return "Actualización y sincronización de versión";
+        }
+
+        // 2. Si solo hay commits pendientes de push
+        if (allTouchedFiles.length === 0 && aheadCommits.length > 0) {
+            if (aheadCommits.length === 1) {
+                return aheadCommits[0].replace(/^v\d+[\.\d]*:\s*/i, '');
+            }
+            return `Sincronizar ${aheadCommits.length} commits pendientes (${aheadCommits.slice(0, 2).join(', ')})`;
+        }
+
+        // 3. Analizar qué tipo de archivos se han tocado
+        const basenames = allTouchedFiles.map(f => path.basename(f));
+        const hasCss = allTouchedFiles.some(f => f.endsWith('.css'));
+        const hasHtml = allTouchedFiles.some(f => f.endsWith('.html'));
+        const hasJs = allTouchedFiles.some(f => f.endsWith('.js') || f.endsWith('.ts'));
+        const hasPkg = allTouchedFiles.some(f => f.includes('package.json') || f.includes('manifest.json'));
+
+        // Leer git diff resumido para captar contexto
+        let diffText = '';
+        try {
+            diffText = execSync('git diff -U0', { cwd: targetPath, encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 512 });
+        } catch (e) {}
+
+        const details = [];
+        if (diffText.includes('deploy') || diffText.includes('openDeployModal')) details.push('modal de despliegue');
+        if (diffText.includes('status') || diffText.includes('badge') || diffText.includes('pulse')) details.push('indicadores de estado y animaciones');
+        if (diffText.includes('version') || diffText.includes('calculateNextVersion')) details.push('sistema de versiones');
+        if (diffText.includes('filter') || diffText.includes('search') || diffText.includes('loading')) details.push('filtros y estado de carga');
+        if (diffText.includes('bot') || diffText.includes('pm2')) details.push('gestión de bots');
+
+        let summary = '';
+        if (details.length > 0) {
+            const detailsStr = details.slice(0, 2).join(' y ');
+            if (basenames.length <= 3) {
+                summary = `Ajustes en ${detailsStr} (${basenames.join(', ')})`;
+            } else {
+                summary = `Ajustes en ${detailsStr} en ${basenames.length} archivos`;
+            }
+        } else if (basenames.length === 1) {
+            const f = basenames[0];
+            if (hasCss) summary = `Ajustes de estilos y diseño en ${f}`;
+            else if (hasHtml) summary = `Actualización de interfaz en ${f}`;
+            else if (hasPkg) summary = `Actualización de versión y configuración en ${f}`;
+            else summary = `Mejoras y correcciones en ${f}`;
+        } else if (basenames.length <= 3) {
+            summary = `Actualización en ${basenames.join(', ')}`;
+        } else {
+            const types = [];
+            if (hasJs) types.push('lógica');
+            if (hasCss) types.push('estilos');
+            if (hasHtml) types.push('interfaz');
+            summary = `Ajustes en ${types.join(', ') || 'archivos'} (${basenames.length} archivos modificados)`;
+        }
+
+        if (aheadCommits.length > 0) {
+            summary += ` + sincronizar ${aheadCommits.length} commit(s)`;
+        }
+
+        return summary;
+    } catch (e) {
+        return "Actualización de proyecto y cambios locales";
+    }
+}
+
+
+app.get('/api/projects/changes-summary', async (req, res) => {
+    try {
+        const name = req.query.name;
+        if (!name) return res.status(400).json({ error: 'Missing project name' });
+        const folderName = name.replace(/ \(.*?\)$/, '');
+        const targetPath = path.join(WORKSPACE_DIR, folderName);
+        if (!fs.existsSync(targetPath)) return res.status(404).json({ error: 'Project folder not found' });
+        const summary = generateChangesSummary(targetPath);
+        res.json({ summary });
+    } catch (e) {
+        console.error('Error generating changes summary:', e);
+        res.json({ summary: 'Actualización y cambios locales' });
+    }
+});
+
 app.post('/api/projects/deploy', async (req, res) => {
     try {
         const { name, version, summary } = req.body;
@@ -567,7 +684,7 @@ app.post('/api/projects/deploy', async (req, res) => {
         }
         
         // 3. Git Push con el formato del usuario: "vX.XX: Resumen"
-        const commitMsg = `v${version.replace('v', '')}: ${summary}`;
+        const commitMsg = `v${version.replace('v', '')}: ${finalSummary}`; 
         if (fs.existsSync(path.join(targetPath, 'scripts/git_push.js'))) {
             execSync(`node scripts/git_push.js "${commitMsg}"`, { cwd: targetPath });
         } else {
