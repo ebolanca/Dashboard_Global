@@ -240,9 +240,6 @@ function applyFiltersAndRender() {
     }
 
     // 5. Mostrar / Ocultar secciones según el filtro
-    const secProjects = document.getElementById('section-projects');
-    const secBots = document.getElementById('section-bots');
-    const emptyState = document.getElementById('empty-state');
 
     const showProjects = filteredProjects.length > 0 && currentFilter !== 'bots';
     const showBots = filteredBots.length > 0 && currentFilter !== 'projects';
