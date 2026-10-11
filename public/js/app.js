@@ -1,4 +1,25 @@
 let config = {};
+let allProjects = [];
+let allBots = [];
+let currentFilter = 'all';
+let currentView = localStorage.getItem('dashboard_view') || 'list';
+let searchQuery = '';
+let logInterval = null;
+
+const iconsMap = {
+    'Horarios': 'fa-calendar-days',
+    'Alquileres': 'fa-house',
+    'Pedidos': 'fa-box',
+    'Vacaciones': 'fa-plane',
+    'Viajes': 'fa-earth-americas',
+    'Dashboard_Global': 'fa-gauge-high',
+    'Domotica': 'fa-house-laptop',
+    'conciertos': 'fa-ticket-simple',
+    'Subastas': 'fa-gavel',
+    'subastas': 'fa-gavel',
+    'Drop': 'fa-paperclip',
+    'drop': 'fa-paperclip'
+};
 
 async function init() {
     try {
@@ -10,15 +31,73 @@ async function init() {
         
         // Marcar pestaña activa
         const currentPC = config.pcName.toLowerCase();
-        document.getElementById(`tab-${currentPC}`).classList.add('active');
+        const tabEl = document.getElementById(`tab-${currentPC}`);
+        if (tabEl) tabEl.classList.add('active');
+
+        // Configurar listeners de la barra de control
+        setupToolbarEvents();
+
+        // Carga inicial de datos
+        await fetchData();
         
-        // Carga inicial
-        fetchData();
-        
-        // Refrescar cada 60 segundos (menos agresivo)
+        // Refrescar cada 60 segundos
         setInterval(fetchData, 60000);
     } catch (e) {
         console.error('Error inicializando dashboard', e);
+    }
+}
+
+function setupToolbarEvents() {
+    // 1. View Switcher (Lista vs Cuadrícula)
+    const btnList = document.getElementById('btn-view-list');
+    const btnGrid = document.getElementById('btn-view-grid');
+
+    function updateViewMode(view) {
+        currentView = view;
+        localStorage.setItem('dashboard_view', view);
+        if (btnList && btnGrid) {
+            btnList.classList.toggle('active', view === 'list');
+            btnGrid.classList.toggle('active', view === 'grid');
+        }
+        applyFiltersAndRender();
+    }
+
+    if (btnList) btnList.addEventListener('click', () => updateViewMode('list'));
+    if (btnGrid) btnGrid.addEventListener('click', () => updateViewMode('grid'));
+    updateViewMode(currentView);
+
+    // 2. Filtros por Píldoras
+    const pillButtons = document.querySelectorAll('.pill-btn');
+    pillButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            pillButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = btn.getAttribute('data-filter') || 'all';
+            applyFiltersAndRender();
+        });
+    });
+
+    // 3. Buscador en tiempo real
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase().trim();
+            applyFiltersAndRender();
+        });
+
+        // Atajo de teclado: presionar '/' o Ctrl+K para buscar
+        window.addEventListener('keydown', (e) => {
+            if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && document.activeElement !== searchInput) {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === 'Escape' && document.activeElement === searchInput) {
+                searchInput.value = '';
+                searchQuery = '';
+                searchInput.blur();
+                applyFiltersAndRender();
+            }
+        });
     }
 }
 
@@ -26,8 +105,8 @@ async function fetchData() {
     try {
         // Cargar proyectos (locales)
         const projectsRes = await fetch('/api/projects');
-        const projects = await projectsRes.json();
-        renderProjects(projects);
+        allProjects = await projectsRes.json();
+        if (!Array.isArray(allProjects)) allProjects = [];
 
         // Cargar bots
         let localBots = [];
@@ -43,8 +122,6 @@ async function fetchData() {
             try {
                 const remoteRes = await fetch(`http://${config.remoteServerIp}:4000/api/bots`);
                 const remoteBots = await remoteRes.json();
-                
-                // Filtramos para traer solo los bots de WhatsApp del remoto
                 const whatsappBots = remoteBots.filter(b => b.name.includes('whatsapp'));
                 finalBots = [...finalBots, ...whatsappBots];
             } catch (e) {
@@ -53,61 +130,147 @@ async function fetchData() {
         }
         
         // Deduplicar bots por nombre único
-        const uniqueBots = [];
         const seenBotNames = new Set();
+        const uniqueBots = [];
         for (const b of finalBots) {
             if (!seenBotNames.has(b.name)) {
                 seenBotNames.add(b.name);
                 uniqueBots.push(b);
             }
         }
-        finalBots = uniqueBots.filter(b => b.name !== 'paperless-ai-watcher');
-        renderBots(finalBots);
-        
-        if (config.pcName === 'MSI') {
-            const paperlessSec = document.getElementById('paperless-section');
-            if (paperlessSec) paperlessSec.style.display = 'none';
-        } else {
-            fetchPaperlessStats();
-        }
-        
+        allBots = uniqueBots.filter(b => b.name !== 'paperless-ai-watcher');
+
+        applyFiltersAndRender();
     } catch (error) {
         console.error('Error fetching data:', error);
     }
 }
 
-function renderProjects(projects) {
-    const grid = document.getElementById('projects-grid');
-    grid.innerHTML = '';
-    
-    if(!projects || projects.length === 0 || projects.error) {
-        grid.innerHTML = `<div class="card"><p>${projects.error || 'No se encontraron proyectos Git.'}</p></div>`;
-        return;
+function applyFiltersAndRender() {
+    // 1. Calcular pendientes
+    const pendingProjects = allProjects.filter(p => (p.localChanges > 0 || p.behind > 0 || p.ahead > 0 || p.error));
+    const pendingBots = allBots.filter(b => b.status !== 'online');
+    const totalPending = pendingProjects.length + pendingBots.length;
+
+    // Actualizar contadores en la barra
+    const countAllEl = document.getElementById('count-all');
+    const countPendingEl = document.getElementById('count-pending');
+    const countProjectsEl = document.getElementById('count-projects');
+    const countBotsEl = document.getElementById('count-bots');
+    const pillPendingEl = document.getElementById('pill-pending');
+
+    if (countAllEl) countAllEl.innerText = allProjects.length + allBots.length;
+    if (countPendingEl) countPendingEl.innerText = totalPending;
+    if (countProjectsEl) countProjectsEl.innerText = allProjects.length;
+    if (countBotsEl) countBotsEl.innerText = allBots.length;
+
+    if (pillPendingEl) {
+        if (totalPending > 0) {
+            pillPendingEl.classList.add('has-pending');
+        } else {
+            pillPendingEl.classList.remove('has-pending');
+        }
     }
 
-    const iconsMap = {
-        'Horarios': 'fa-calendar-days',
-        'Alquileres': 'fa-house',
-        'Pedidos': 'fa-box',
-        'Vacaciones': 'fa-plane',
-        'Viajes': 'fa-earth-americas',
-        'Dashboard_Global': 'fa-gauge-high',
-        'Domotica': 'fa-house-laptop',
-        'conciertos': 'fa-ticket-simple',
-        'Subastas': 'fa-gavel',
-        'subastas': 'fa-gavel',
-        'Drop': 'fa-paperclip',
-        'drop': 'fa-paperclip'
-    };
+    // Actualizar contadores de sección
+    const secProjCount = document.getElementById('section-count-projects');
+    const secBotsCount = document.getElementById('section-count-bots');
+    if (secProjCount) secProjCount.innerText = allProjects.length;
+    if (secBotsCount) secBotsCount.innerText = allBots.length;
+
+    // 2. Filtrar proyectos
+    let filteredProjects = allProjects;
+    if (currentFilter === 'pending') {
+        filteredProjects = pendingProjects;
+    } else if (currentFilter === 'bots') {
+        filteredProjects = [];
+    }
+
+    if (searchQuery) {
+        filteredProjects = filteredProjects.filter(p => 
+            p.name.toLowerCase().includes(searchQuery) ||
+            (p.lastCommit && p.lastCommit.toLowerCase().includes(searchQuery)) ||
+            (p.branch && p.branch.toLowerCase().includes(searchQuery))
+        );
+    }
+
+    // 3. Filtrar bots
+    let filteredBots = allBots;
+    if (currentFilter === 'pending') {
+        filteredBots = pendingBots;
+    } else if (currentFilter === 'projects') {
+        filteredBots = [];
+    }
+
+    if (searchQuery) {
+        filteredBots = filteredBots.filter(b => b.name.toLowerCase().includes(searchQuery));
+    }
+
+    // 4. Actualizar clases de vista en wrappers
+    const projWrapper = document.getElementById('projects-grid');
+    const botsWrapper = document.getElementById('bots-grid');
+    const viewClass = currentView === 'grid' ? 'view-grid' : 'view-list';
+
+    if (projWrapper) {
+        projWrapper.className = `projects-wrapper ${viewClass}`;
+    }
+    if (botsWrapper) {
+        botsWrapper.className = `bots-wrapper ${viewClass}`;
+    }
+
+    // 5. Mostrar / Ocultar secciones según el filtro
+    const secProjects = document.getElementById('section-projects');
+    const secBots = document.getElementById('section-bots');
+    const emptyState = document.getElementById('empty-state');
+
+    const showProjects = filteredProjects.length > 0 && currentFilter !== 'bots';
+    const showBots = filteredBots.length > 0 && currentFilter !== 'projects';
+
+    if (secProjects) secProjects.style.display = showProjects ? 'block' : 'none';
+    if (secBots) secBots.style.display = showBots ? 'block' : 'none';
+
+    if (!showProjects && !showBots) {
+        if (emptyState) {
+            emptyState.style.display = 'block';
+            if (currentFilter === 'pending') {
+                emptyState.querySelector('h3').innerText = '¡Todo está sincronizado y al día!';
+                emptyState.querySelector('p').innerText = 'No hay ningún proyecto con cambios locales ni bots caídos.';
+            } else if (searchQuery) {
+                emptyState.querySelector('h3').innerText = 'No se encontraron resultados';
+                emptyState.querySelector('p').innerText = `No hay proyectos ni bots que coincidan con "${searchQuery}".`;
+            } else {
+                emptyState.querySelector('h3').innerText = 'Sin elementos';
+                emptyState.querySelector('p').innerText = 'No hay servicios en esta categoría.';
+            }
+        }
+    } else {
+        if (emptyState) emptyState.style.display = 'none';
+    }
+
+    // 6. Renderizar
+    if (showProjects) renderProjects(filteredProjects);
+    if (showBots) renderBots(filteredBots);
+}
+
+function renderProjects(projects) {
+    const grid = document.getElementById('projects-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    if(!projects || projects.length === 0) {
+        return;
+    }
 
     projects.forEach(p => {
         let statusClass = 'status-online';
         let statusText = 'Actualizado';
         let clickAction = "";
+        let pulseDot = true;
 
         if (p.error) {
             statusClass = 'status-offline';
             statusText = 'Error Git';
+            pulseDot = false;
         } else if (p.behind > 0 || p.ahead > 0) {
             statusClass = 'status-warning pullable';
             statusText = `Sincronizar (${p.behind || 0}↓ ${p.ahead || 0}↑)`;
@@ -119,9 +282,8 @@ function renderProjects(projects) {
         }
 
         const icon = p.icon || iconsMap[p.name] || 'fa-folder';
-
-        // Botón de Acción (Cohete): Se muestra si hay cambios locales o estamos ahead de GitHub
         const hasChanges = p.localChanges > 0 || p.ahead > 0;
+        
         const actionBtn = hasChanges ? `
             <button class="btn-action deploy-btn" onclick="openDeployModal(event, '${p.name}', '${p.version}')" title="Sincronizar y Subir cambios">
                 <i class="fa-solid fa-rocket"></i>
@@ -129,64 +291,64 @@ function renderProjects(projects) {
         ` : '';
 
         const firebaseBtn = (p.consoleUrl && p.consoleUrl !== '#') ? `
-            <button class="btn-action" onclick="window.openUrl(event, '${p.consoleUrl}')" title="Firebase">
+            <button class="btn-action" onclick="window.openUrl(event, '${p.consoleUrl}')" title="Consola Firebase">
                 <i class="fa-solid fa-cloud"></i>
             </button>
         ` : '';
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.style.cursor = 'pointer';
-        card.onclick = () => window.openUrl(null, p.url);
+        const row = document.createElement('div');
+        row.className = 'row-item';
 
-        card.innerHTML = `
-            <div class="card-header">
-                <i class="fa-solid ${icon} card-icon"></i>
-                <div class="card-title">
-                    ${p.name}
-                    <span class="card-version">${p.version || 'v?'}</span>
+        row.innerHTML = `
+            <!-- Columna 1: Identificador -->
+            <div class="row-identity" onclick="window.openUrl(event, '${p.url}')" title="Abrir ${p.name}">
+                <div class="row-icon-box">
+                    <i class="fa-solid ${icon}"></i>
+                </div>
+                <div class="row-name-block">
+                    <div class="row-title">
+                        <span>${p.name}</span>
+                    </div>
+                    <span class="row-version">${p.version || 'v?'}</span>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="detail-row">
-                    <span>Rama:</span>
-                    <span class="detail-value">${p.branch || '-'}</span>
-                </div>
-                <div class="detail-row">
-                    <span>Cambios locales:</span>
-                    <span class="detail-value" style="${p.localChanges > 0 ? 'color: var(--status-warning)' : ''}">${p.localChanges || 0}</span>
-                </div>
-                <div class="commit-msg">
-                    <i class="fa-solid fa-code-commit"></i>
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.lastCommit}">
-                        ${p.lastCommit}
-                    </span>
-                </div>
-                <div class="card-actions">
-                    <button class="btn-action" onclick="window.openUrl(event, '${p.githubUrl}')" title="GitHub">
-                        <i class="fa-brands fa-github"></i>
-                    </button>
-                    ${firebaseBtn}
-                    ${actionBtn}
-                </div>
-            </div>
-            <div class="card-footer">
-                <div class="status-badge ${statusClass}" ${clickAction}>
-                    <div class="status-dot"></div>
+
+            <!-- Columna 2: Estado Git / Despliegue -->
+            <div class="row-status">
+                <div class="status-badge ${statusClass}" ${clickAction} title="${statusText}">
+                    <div class="status-dot ${pulseDot ? 'pulse' : ''}"></div>
                     <span>${statusText}</span>
                 </div>
             </div>
+
+            <!-- Columna 3: Rama y Último Commit -->
+            <div class="row-meta">
+                <span class="branch-tag" title="Rama">${p.branch || 'main'}</span>
+                <div class="commit-text" title="${p.lastCommit || 'Sin commit'}">
+                    <i class="fa-solid fa-code-commit"></i>
+                    <span>${p.lastCommit || '-'}</span>
+                </div>
+            </div>
+
+            <!-- Columna 4: Acciones -->
+            <div class="row-actions">
+                <button class="btn-action" onclick="window.openUrl(event, '${p.githubUrl}')" title="Ver en GitHub">
+                    <i class="fa-brands fa-github"></i>
+                </button>
+                ${firebaseBtn}
+                ${actionBtn}
+            </div>
         `;
-        grid.appendChild(card);
+        grid.appendChild(row);
     });
 }
 
 function renderBots(bots) {
     const grid = document.getElementById('bots-grid');
+    if (!grid) return;
     grid.innerHTML = '';
     
     if(!bots || bots.length === 0) {
-        grid.innerHTML = '<div class="card"><p>No hay bots activos en OMEN.</p></div>';
         return;
     }
 
@@ -197,36 +359,67 @@ function renderBots(bots) {
         const icon = isWhatsApp ? 'fa-brands fa-whatsapp' : 'fa-solid fa-robot';
         const iconColor = isWhatsApp ? '#25D366' : 'var(--accent)';
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        if (isWhatsApp) {
-            card.style.cursor = 'pointer';
-            card.onclick = () => window.showBotLogs(b.name);
-        }
+        const row = document.createElement('div');
+        row.className = 'row-item';
 
-        card.innerHTML = `
-            <div class="card-header">
-                <i class="${icon} card-icon" style="color: ${iconColor}"></i>
-                <div class="card-title">${b.name}</div>
+        const logsBtn = isWhatsApp ? `
+            <button class="btn-action btn-text" onclick="window.showBotLogs('${b.name}')" title="Ver mensajes y logs">
+                <i class="fa-solid fa-terminal"></i> <span>Logs</span>
+            </button>
+        ` : '';
+
+        row.innerHTML = `
+            <!-- Columna 1: Identificador -->
+            <div class="row-identity" ${isWhatsApp ? `onclick="window.showBotLogs('${b.name}')" style="cursor: pointer;"` : ''}>
+                <div class="row-icon-box" style="border-color: ${iconColor}40">
+                    <i class="${icon}" style="color: ${iconColor}"></i>
+                </div>
+                <div class="row-name-block">
+                    <div class="row-title">
+                        <span>${b.name}</span>
+                    </div>
+                    <span class="row-version">PM2</span>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="detail-row"><span>RAM:</span><span class="detail-value">${b.memory} MB</span></div>
-                <div class="detail-row"><span>CPU:</span><span class="detail-value">${b.cpu}%</span></div>
-                <div class="detail-row"><span>Uptime:</span><span class="detail-value">${Math.floor(b.uptime / 3600000)}h</span></div>
-            </div>
-            <div class="card-footer">
+
+            <!-- Columna 2: Estado -->
+            <div class="row-status">
                 <div class="status-badge ${statusClass}">
-                    <div class="status-dot"></div>
+                    <div class="status-dot ${isOnline ? 'pulse' : ''}"></div>
                     <span>${b.status}</span>
                 </div>
             </div>
+
+            <!-- Columna 3: Métricas de rendimiento -->
+            <div class="row-meta">
+                <div class="bot-metrics">
+                    <div class="metric-pill" title="Memoria RAM">
+                        <i class="fa-solid fa-memory" style="color: var(--accent);"></i>
+                        <strong>${b.memory}</strong> MB
+                    </div>
+                    <div class="metric-pill" title="Uso de CPU">
+                        <i class="fa-solid fa-microchip" style="color: #a855f7;"></i>
+                        <strong>${b.cpu}</strong>%
+                    </div>
+                    <div class="metric-pill" title="Tiempo activo">
+                        <i class="fa-solid fa-clock" style="color: #10b981;"></i>
+                        <strong>${Math.floor(b.uptime / 3600000)}</strong>h
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna 4: Acciones -->
+            <div class="row-actions">
+                ${logsBtn}
+            </div>
         `;
-        grid.appendChild(card);
+        grid.appendChild(row);
     });
 }
 
 window.openUrl = (e, url) => {
     if (e) e.stopPropagation();
+    if (!url || url === '#') return;
     window.open(url, '_blank');
 };
 
@@ -241,7 +434,7 @@ window.pullProject = async function(event, name) {
     
     if (badge) {
         originalHtml = badge.innerHTML;
-        badge.innerHTML = '<div class="spinner" style="width:14px; height:14px; border-width:2px;"></div> <span style="margin-left:8px">Actualizando...</span>';
+        badge.innerHTML = '<div class="spinner" style="width:12px; height:12px; border-width:2px;"></div> <span style="margin-left:6px">Actualizando...</span>';
         badge.style.pointerEvents = 'none';
         badge.classList.add('syncing');
     }
@@ -275,7 +468,7 @@ window.syncAllProjects = async function() {
     if (!btn) return;
 
     const originalContent = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando todo...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Sincronizando...</span>';
     btn.disabled = true;
 
     try {
@@ -299,8 +492,6 @@ window.syncAllProjects = async function() {
     }
 };
 
-let logInterval = null;
-
 window.showBotLogs = async (name) => {
     document.getElementById('modal-bot-name').innerText = name;
     document.getElementById('bot-logs-content').innerHTML = '<div class="spinner"></div>';
@@ -320,7 +511,6 @@ window.showBotLogs = async (name) => {
                 const container = document.getElementById('bot-logs-content');
                 const preElement = container.querySelector('.terminal-logs');
                 
-                // Evitamos parpadeos y saltos de scroll si los logs no han cambiado
                 if (!preElement || preElement.textContent !== logsText) {
                     container.innerHTML = `<pre class="terminal-logs">${logsText}</pre>`;
                     container.scrollTop = container.scrollHeight;
@@ -333,20 +523,16 @@ window.showBotLogs = async (name) => {
         }
     };
 
-    // Carga inicial
     await fetchLogs();
 
-    // Limpiamos cualquier intervalo activo previo
     if (logInterval) clearInterval(logInterval);
-    
-    // Auto-actualizar logs cada 5 segundos mientras esté abierto el modal para capturar el QR fresco
     logInterval = setInterval(fetchLogs, 5000);
 };
 
 window.openDeployModal = (e, name, currentVersion) => {
     if (e) e.stopPropagation();
     document.getElementById('modal-project-name').innerText = name;
-    document.getElementById('deploy-version').value = currentVersion.replace('v', '');
+    document.getElementById('deploy-version').value = (currentVersion || '1.0.0').replace('v', '');
     document.getElementById('deploy-summary').value = '';
     document.getElementById('deploy-modal').style.display = 'flex';
     
@@ -367,7 +553,7 @@ window.confirmDeploy = async (name) => {
     }
     
     const btn = document.getElementById('btn-confirm-deploy');
-    btn.innerText = "Procesando...";
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
     btn.disabled = true;
 
     try {
@@ -388,7 +574,7 @@ window.confirmDeploy = async (name) => {
         console.error(e);
         alert("Error de conexión con el servidor.");
     } finally {
-        btn.innerText = "Confirmar y Subir";
+        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Confirmar y Subir';
         btn.disabled = false;
     }
 };
@@ -401,137 +587,5 @@ window.closeBotModal = () => {
     document.getElementById('bot-modal').style.display = 'none';
 };
 
-// Iniciar
+// Iniciar aplicación
 init();
-
-async function fetchPaperlessStats() {
-    try {
-        const res = await fetch('/api/paperless/stats');
-        const data = await res.json();
-        renderPaperlessStats(data);
-    } catch (e) {
-        console.error('Error cargando métricas de Paperless:', e);
-        const container = document.getElementById('paperless-container');
-        if (container) {
-            container.innerHTML = '<div class="card"><p>Error conectando con Paperless API.</p></div>';
-        }
-    }
-}
-
-function renderPaperlessStats(data) {
-    const badge = document.getElementById('paperless-status-badge');
-    const badgeText = document.getElementById('paperless-status-text');
-    const container = document.getElementById('paperless-container');
-
-    if (!data || data.error) {
-        if (badge) {
-            badge.className = 'status-badge status-offline';
-        }
-        if (badgeText) badgeText.innerText = 'Desconectado';
-        if (container) container.innerHTML = '<div class="card"><p>No disponible.</p></div>';
-        return;
-    }
-
-    if (badge) {
-        badge.className = `status-badge ${data.statusClass || 'status-online'}`;
-    }
-    if (badgeText) {
-        badgeText.innerText = data.statusText || 'En línea';
-    }
-
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="card" style="grid-column: 1 / -1;">
-            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-brain card-icon" style="color: #a855f7; font-size: 1.3em;"></i>
-                    <div class="card-title" style="font-size: 1.15em; font-weight: 700;">Progreso de Análisis de IA</div>
-                </div>
-            </div>
-            <div class="card-body">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 0.8em; color: var(--text-muted);">Documentos Totales Activos</div>
-                        <div style="font-size: 1.6em; font-weight: 700; color: #fff;">${data.activeDocs ? data.activeDocs.toLocaleString('es-ES') : 0}</div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 0.8em; color: var(--text-muted);">Etiquetados (Tags)</div>
-                        <div style="font-size: 1.6em; font-weight: 700; color: #3b82f6;">${data.taggedDocs ? data.taggedDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #93c5fd;">(${data.taggedPercent}%)</span></div>
-                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
-                            <div style="background: #3b82f6; height: 100%; width: ${data.taggedPercent}%;"></div>
-                        </div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 0.8em; color: var(--text-muted);">Con Corresponsal (Emisor)</div>
-                        <div style="font-size: 1.6em; font-weight: 700; color: #10b981;">${data.correspondentDocs ? data.correspondentDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #6ee7b7;">(${data.correspondentPercent}%)</span></div>
-                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
-                            <div style="background: #10b981; height: 100%; width: ${data.correspondentPercent}%;"></div>
-                        </div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 0.8em; color: var(--text-muted);">Con Tipo de Documento</div>
-                        <div style="font-size: 1.6em; font-weight: 700; color: #f59e0b;">${data.docTypeDocs ? data.docTypeDocs.toLocaleString('es-ES') : 0} <span style="font-size: 0.6em; color: #fde68a;">(${data.docTypePercent}%)</span></div>
-                        <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;">
-                            <div style="background: #f59e0b; height: 100%; width: ${data.docTypePercent}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="detail-row" style="margin-top: 10px;">
-                    <span>Etiquetas únicas generadas:</span>
-                    <span class="detail-value" style="color: #60a5fa;">${data.tagsCount ? data.tagsCount.toLocaleString('es-ES') : 0}</span>
-                </div>
-                <div class="detail-row">
-                    <span>Corresponsales identificados:</span>
-                    <span class="detail-value" style="color: #34d399;">${data.correspondentsCount ? data.correspondentsCount.toLocaleString('es-ES') : 0}</span>
-                </div>
-                <div class="detail-row">
-                    <span>Tipos de documento clasificados:</span>
-                    <span class="detail-value" style="color: #fbbf24;">${data.docTypesCount ? data.docTypesCount.toLocaleString('es-ES') : 0}</span>
-                </div>
-                <div class="commit-msg" style="margin-top: 14px; font-size: 0.88em; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 10px 14px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 250px;">
-                        <i class="fa-solid fa-clock-rotate-left" style="color: #c084fc;"></i>
-                        <span>Último analizado: <strong style="color: #f3e8ff;">${data.lastProcessedTitle || 'Cargando...'}</strong></span>
-                    </div>
-                    ${data.lastProcessedTime ? `
-                        <div style="font-size: 0.85em; color: #d8b4fe; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500;">
-                            <i class="fa-regular fa-clock" style="color: #c084fc;"></i>
-                            <span>${data.lastProcessedTime}</span>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-window.restartPaperlessAI = async function(e) {
-    if (e) e.stopPropagation();
-    const btn = e ? e.currentTarget : null;
-    let originalText = '';
-    if (btn) {
-        originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reiniciando...';
-        btn.disabled = true;
-    }
-
-    try {
-        const res = await fetch('/api/paperless/restart', { method: 'POST' });
-        if (res.ok) {
-            alert('¡Servicio de IA de Paperless reiniciado con éxito!');
-            setTimeout(fetchPaperlessStats, 2000);
-        } else {
-            alert('No se pudo reiniciar el servicio de IA.');
-        }
-    } catch (err) {
-        console.error('Error al reiniciar IA:', err);
-        alert('Error de conexión.');
-    } finally {
-        if (btn) {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    }
-};

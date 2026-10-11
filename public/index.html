@@ -6,72 +6,148 @@
     <title>Global Dashboard</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <header class="header">
-        <div class="pc-switcher">
-            <a href="http://100.95.217.45:4000" id="tab-omen" class="pc-tab">
-                <i class="fa-solid fa-server"></i> OMEN
-            </a>
-            <a href="http://localhost:4000" id="tab-msi" class="pc-tab">
-                <i class="fa-solid fa-laptop"></i> MSI
-            </a>
+        <div class="header-content">
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div>
+                    <h1>Dashboard <span id="pc-name-display">...</span></h1>
+                    <p class="header-subtitle">Panel de control de proyectos y servicios en producción</p>
+                </div>
+            </div>
+
+            <div class="pc-switcher">
+                <a href="http://100.95.217.45:4000" id="tab-omen" class="pc-tab">
+                    <i class="fa-solid fa-server"></i> OMEN
+                </a>
+                <a href="http://localhost:4000" id="tab-msi" class="pc-tab">
+                    <i class="fa-solid fa-laptop"></i> MSI
+                </a>
+            </div>
         </div>
-        <h1>Dashboard <span id="pc-name-display">...</span></h1>
+
+        <!-- Barra de Control Rápido: Filtros, Buscador y Selector de Vista -->
+        <div class="toolbar">
+            <div class="filter-pills">
+                <button class="pill-btn active" data-filter="all">
+                    <i class="fa-solid fa-cubes"></i> Todos <span class="pill-badge" id="count-all">0</span>
+                </button>
+                <button class="pill-btn warning-pill" data-filter="pending" id="pill-pending">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Pendientes <span class="pill-badge badge-warning" id="count-pending">0</span>
+                </button>
+                <button class="pill-btn" data-filter="projects">
+                    <i class="fa-solid fa-code-branch"></i> Proyectos <span class="pill-badge" id="count-projects">0</span>
+                </button>
+                <button class="pill-btn" data-filter="bots">
+                    <i class="fa-solid fa-robot"></i> Bots PM2 <span class="pill-badge" id="count-bots">0</span>
+                </button>
+            </div>
+
+            <div class="toolbar-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Buscar proyecto o bot... (tecla /)" autocomplete="off">
+                    <span class="search-kbd">/</span>
+                </div>
+
+                <div class="view-switch">
+                    <button class="view-btn active" id="btn-view-list" title="Vista Lista Compacta (Alta Densidad - Sin scroll)">
+                        <i class="fa-solid fa-list"></i>
+                    </button>
+                    <button class="view-btn" id="btn-view-grid" title="Vista Cuadrícula (Tarjetas)">
+                        <i class="fa-solid fa-grip"></i>
+                    </button>
+                </div>
+
+                <button class="btn-sync-all" onclick="window.syncAllProjects()" id="btn-sync-all">
+                    <i class="fa-solid fa-rotate"></i> <span>Sincronizar Todo</span>
+                </button>
+            </div>
+        </div>
     </header>
 
     <main class="container">
-        <section class="dashboard-section">
+        <!-- Estado Vacío cuando se filtra -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <h3>¡Todo está sincronizado y al día!</h3>
+            <p>No hay proyectos con cambios pendientes ni servicios con incidencias.</p>
+        </div>
+
+        <!-- Sección de Proyectos GitHub -->
+        <section class="dashboard-section" id="section-projects">
             <div class="section-header">
-                <h2 class="section-title"><i class="fa-solid fa-code-branch"></i> Proyectos GitHub</h2>
-                <button class="btn-sync-all" onclick="window.syncAllProjects()" id="btn-sync-all">
-                    <i class="fa-solid fa-rotate"></i> Sincronizar Todo
-                </button>
+                <h2 class="section-title">
+                    <i class="fa-solid fa-code-branch title-icon"></i> 
+                    Proyectos GitHub 
+                    <span class="section-counter" id="section-count-projects">0</span>
+                </h2>
             </div>
-            <div class="grid" id="projects-grid">
+            <div class="projects-wrapper view-list" id="projects-grid">
                 <div class="card loading"><div class="spinner"></div></div>
             </div>
         </section>
 
-        <section class="dashboard-section">
+        <!-- Sección de Bots Activos (PM2) -->
+        <section class="dashboard-section" id="section-bots">
             <div class="section-header">
-                <h2 class="section-title"><i class="fa-solid fa-robot"></i> Bots Activos (PM2)</h2>
+                <h2 class="section-title">
+                    <i class="fa-solid fa-robot title-icon"></i> 
+                    Bots Activos (PM2) 
+                    <span class="section-counter" id="section-count-bots">0</span>
+                </h2>
             </div>
-            <div class="grid" id="bots-grid">
+            <div class="bots-wrapper view-list" id="bots-grid">
                 <div class="card loading"><div class="spinner"></div></div>
             </div>
         </section>
-
-        
     </main>
 
     <!-- Modal de Despliegue -->
     <div id="deploy-modal" class="modal">
         <div class="modal-content">
-            <h3>Actualizar y Subir: <span id="modal-project-name"></span></h3>
+            <div class="modal-header">
+                <div class="modal-icon-badge"><i class="fa-solid fa-rocket"></i></div>
+                <div>
+                    <h3>Actualizar y Subir</h3>
+                    <p class="modal-project-sub" id="modal-project-name">Proyecto</p>
+                </div>
+            </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Nueva Versión (ej: 1.0.5)</label>
+                    <label><i class="fa-solid fa-tag"></i> Nueva Versión (ej: 1.0.5)</label>
                     <input type="text" id="deploy-version" placeholder="X.X.X">
                 </div>
                 <div class="form-group">
-                    <label>Resumen de cambios (en español)</label>
+                    <label><i class="fa-solid fa-pen-to-square"></i> Resumen de cambios (en español)</label>
                     <textarea id="deploy-summary" rows="3" placeholder="¿Qué has cambiado?"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="window.closeModal()">Cancelar</button>
-                <button class="btn-primary" id="btn-confirm-deploy">Confirmar y Subir</button>
+                <button class="btn-primary" id="btn-confirm-deploy">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Confirmar y Subir
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Logs de Bot -->
     <div id="bot-modal" class="modal">
-        <div class="modal-content">
-            <h3>Últimos mensajes: <span id="modal-bot-name"></span></h3>
+        <div class="modal-content modal-logs">
+            <div class="modal-header">
+                <div class="modal-icon-badge whatsapp-badge"><i class="fa-brands fa-whatsapp"></i></div>
+                <div>
+                    <h3>Logs de Bot</h3>
+                    <p class="modal-project-sub" id="modal-bot-name">Bot</p>
+                </div>
+            </div>
             <div id="bot-logs-content" class="logs-container">
                 <div class="spinner"></div>
             </div>
