@@ -339,7 +339,7 @@ app.get('/api/projects', async (req, res) => {
 
                     const iconsMap = {
                         'Horarios': 'fa-calendar-days',
-                        'Pedidos': 'fa-box',
+                        'Pedidos': 'fa-utensils',
                         'Vacaciones': 'fa-plane',
                         'Viajes': 'fa-earth-americas',
                         'Dashboard_Global': 'fa-gauge-high',

@@ -9,7 +9,7 @@ let logInterval = null;
 const iconsMap = {
     'Horarios': 'fa-calendar-days',
     'Alquileres': 'fa-house',
-    'Pedidos': 'fa-box',
+    'Pedidos': 'fa-utensils',
     'Vacaciones': 'fa-plane',
     'Viajes': 'fa-earth-americas',
     'Dashboard_Global': 'fa-gauge-high',
