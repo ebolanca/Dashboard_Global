@@ -343,9 +343,9 @@ app.get('/api/projects', async (req, res) => {
                         'Vacaciones': 'fa-plane',
                         'Viajes': 'fa-earth-americas',
                         'Dashboard_Global': 'fa-gauge-high',
-                        'Domotica': 'fa-house-laptop',
-                        'conciertos': 'fa-ticket-simple',
-                        'Conciertos': 'fa-ticket-simple',
+                        'Domotica': 'fa-house-signal',
+                        'conciertos': 'fa-guitar',
+                        'Conciertos': 'fa-guitar',
                         'Musica': 'fa-music',
                         'musica': 'fa-music',
                         'Subastas': 'fa-gavel',
@@ -400,7 +400,7 @@ app.get('/api/projects', async (req, res) => {
                 console.error(`Error checking git for ${f}`, e);
                 const localBase = (port) => IS_MSI ? `http://localhost:${port}` : `http://${REMOTE_SERVER_IP}:${port}`;
                 const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
-                const iconsMap = { 'conciertos': 'fa-ticket-simple', 'Conciertos': 'fa-ticket-simple', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip' };
+                const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal' };
                 const urlsMap = { 
                     'conciertos': localBase(8086), 
                     'Conciertos': localBase(8086), 
