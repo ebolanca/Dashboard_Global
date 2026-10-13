@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const pm2 = require('pm2');
 const simpleGit = require('simple-git');
@@ -890,6 +890,32 @@ app.get('/api/bots/logs/:name', (req, res) => {
         res.json({ logs: lines });
     } catch (e) {
         res.status(500).json({ error: 'Error reading logs', details: e.message });
+    }
+});
+
+// --- API BANDEJA DE ENTRADA WHATSAPP META (INBOX) ---
+const WHATSAPP_INBOX_FILE = path.join(__dirname, 'data', 'whatsapp_inbox.json');
+
+app.get('/api/whatsapp/inbox', (req, res) => {
+    try {
+        if (!fs.existsSync(WHATSAPP_INBOX_FILE)) {
+            return res.json([]);
+        }
+        const raw = fs.readFileSync(WHATSAPP_INBOX_FILE, 'utf8');
+        const list = JSON.parse(raw || '[]');
+        res.json(list);
+    } catch (e) {
+        console.error('Error leyendo bandeja de WhatsApp:', e.message);
+        res.status(500).json({ error: 'Error leyendo bandeja de WhatsApp', details: e.message });
+    }
+});
+
+app.delete('/api/whatsapp/inbox', (req, res) => {
+    try {
+        fs.writeFileSync(WHATSAPP_INBOX_FILE, '[]', 'utf8');
+        res.json({ success: true, message: 'Bandeja vaciada correctamente' });
+    } catch (e) {
+        res.status(500).json({ error: 'Error vaciando bandeja', details: e.message });
     }
 });
 

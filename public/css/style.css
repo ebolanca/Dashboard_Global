@@ -993,3 +993,422 @@ body {
     text-transform: none;
     letter-spacing: normal;
 }
+
+/* ==========================================
+   BANDEJA DE ENTRADA WHATSAPP META (INBOX)
+   ========================================== */
+
+.btn-whatsapp-inbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(37, 211, 102, 0.12);
+    color: #25d366;
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.btn-whatsapp-inbox:hover {
+    background: rgba(37, 211, 102, 0.22);
+    border-color: #25d366;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.2);
+}
+
+.inbox-badge {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    line-height: 1;
+}
+
+.modal-content.modal-inbox {
+    max-width: 860px;
+    width: 95%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.inbox-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-refresh-inbox, .btn-icon-close {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-refresh-inbox:hover {
+    color: #25d366;
+    border-color: rgba(37, 211, 102, 0.4);
+    background: rgba(37, 211, 102, 0.1);
+}
+
+.btn-icon-close:hover {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.inbox-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--card-border);
+    margin-bottom: 12px;
+}
+
+.inbox-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.inbox-tab-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.inbox-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+}
+
+.inbox-tab-btn.active {
+    background: rgba(37, 211, 102, 0.15);
+    border-color: rgba(37, 211, 102, 0.4);
+    color: #25d366;
+}
+
+.inbox-tab-btn .tab-badge {
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 8px;
+}
+
+.inbox-tab-btn.active .tab-badge {
+    background: rgba(37, 211, 102, 0.25);
+    color: #25d366;
+}
+
+.badge-otp {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: #f59e0b !important;
+}
+
+.inbox-search {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+}
+
+.inbox-search i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.inbox-search input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 6px 10px 6px 30px;
+    color: var(--text-main);
+    font-size: 0.82rem;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.inbox-search input:focus {
+    border-color: #25d366;
+    background: rgba(37, 211, 102, 0.03);
+}
+
+.inbox-messages-container {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 520px;
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 4px;
+}
+
+.inbox-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+
+.inbox-empty i {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.4;
+}
+
+.inbox-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inbox-card:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.inbox-card.card-otp {
+    border-left: 3px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.025);
+}
+
+.inbox-card.card-amazon {
+    border-left: 3px solid #ff9900;
+    background: rgba(255, 153, 0, 0.03);
+}
+
+.inbox-card.card-media {
+    border-left: 3px solid #38bdf8;
+}
+
+.inbox-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.inbox-sender-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.inbox-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(37, 211, 102, 0.15);
+    color: #25d366;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.inbox-avatar.avatar-amazon {
+    background: rgba(255, 153, 0, 0.2);
+    color: #ff9900;
+}
+
+.inbox-sender-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.inbox-sender-phone {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: 6px;
+}
+
+.inbox-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inbox-type-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tag-otp {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tag-amazon {
+    background: rgba(255, 153, 0, 0.2);
+    color: #ff9900;
+    border: 1px solid rgba(255, 153, 0, 0.3);
+}
+
+.tag-image {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.tag-text {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+}
+
+.inbox-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.inbox-card-body {
+    font-size: 0.88rem;
+    color: var(--text-main);
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.otp-box-display {
+    margin-top: 6px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px dashed rgba(245, 158, 11, 0.4);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.otp-code-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fbbf24;
+    letter-spacing: 2px;
+}
+
+.btn-copy-otp {
+    background: #f59e0b;
+    color: #111;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.btn-copy-otp:hover {
+    background: #fbbf24;
+    transform: scale(1.02);
+}
+
+.inbox-image-wrapper {
+    margin-top: 8px;
+    display: inline-block;
+}
+
+.inbox-img-thumb {
+    max-width: 280px;
+    max-height: 220px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.inbox-img-thumb:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.inbox-image-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.btn-view-img {
+    font-size: 0.75rem;
+    color: #38bdf8;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-view-img:hover {
+    text-decoration: underline;
+}
+
+.inbox-alert-amazon {
+    margin-top: 6px;
+    background: rgba(255, 153, 0, 0.08);
+    border: 1px solid rgba(255, 153, 0, 0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #ffb84d;
+    line-height: 1.4;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.btn-danger-soft {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #ef4444 !important;
+    border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+.btn-danger-soft:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-color: #ef4444 !important;
+}

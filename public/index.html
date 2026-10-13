@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -67,6 +67,10 @@
 
                 <button class="btn-sync-all" onclick="window.syncAllProjects()" id="btn-sync-all">
                     <i class="fa-solid fa-rotate"></i> <span>Sincronizar Todo</span>
+                </button>
+                <button class="btn-whatsapp-inbox" onclick="window.openWhatsAppInbox()" id="btn-whatsapp-inbox" title="Bandeja de mensajes de WhatsApp Meta">
+                    <i class="fa-brands fa-whatsapp"></i> <span>Mensajes Meta</span>
+                    <span class="inbox-badge" id="whatsapp-inbox-count" style="display: none;">0</span>
                 </button>
             </div>
         </div>
@@ -166,5 +170,67 @@
     </div>
 
     <script src="js/app.js"></script>
+    <!-- Modal Bandeja de Entrada WhatsApp Meta -->
+    <div id="whatsapp-inbox-modal" class="modal">
+        <div class="modal-content modal-inbox">
+            <div class="modal-header">
+                <div class="modal-icon-badge whatsapp-badge">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h3>Bandeja WhatsApp Meta Cloud</h3>
+                        <div class="inbox-header-actions">
+                            <button class="btn-refresh-inbox" onclick="window.fetchWhatsAppInbox(true)" title="Recargar mensajes">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <button class="btn-icon-close" onclick="window.closeWhatsAppInbox()" title="Cerrar ventana">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="modal-project-sub">Línea oficial (+34 622 60 90 30) • Códigos de Amazon / OTP, fotos de huéspedes y consultas</p>
+                </div>
+            </div>
+
+            <!-- Barra de Filtros y Búsqueda del Inbox -->
+            <div class="inbox-toolbar">
+                <div class="inbox-filters">
+                    <button class="inbox-tab-btn active" data-inbox-filter="all" onclick="window.setInboxFilter('all')">
+                        <i class="fa-solid fa-inbox"></i> Todos <span class="tab-badge" id="inbox-count-all">0</span>
+                    </button>
+                    <button class="inbox-tab-btn" data-inbox-filter="otp" onclick="window.setInboxFilter('otp')">
+                        <i class="fa-solid fa-key"></i> Códigos / OTP <span class="tab-badge badge-otp" id="inbox-count-otp">0</span>
+                    </button>
+                    <button class="inbox-tab-btn" data-inbox-filter="media" onclick="window.setInboxFilter('media')">
+                        <i class="fa-solid fa-image"></i> Fotos / Adjuntos <span class="tab-badge" id="inbox-count-media">0</span>
+                    </button>
+                    <button class="inbox-tab-btn" data-inbox-filter="guest" onclick="window.setInboxFilter('guest')">
+                        <i class="fa-solid fa-user"></i> Huéspedes <span class="tab-badge" id="inbox-count-guest">0</span>
+                    </button>
+                </div>
+                <div class="inbox-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="inbox-search-input" placeholder="Buscar por remitente, texto o código..." oninput="window.renderWhatsAppInbox()">
+                </div>
+            </div>
+
+            <!-- Lista de Mensajes -->
+            <div id="whatsapp-inbox-content" class="inbox-messages-container">
+                <div class="spinner"></div>
+            </div>
+
+            <div class="modal-footer" style="justify-content: space-between;">
+                <div>
+                    <button class="btn-secondary btn-danger-soft" onclick="window.clearWhatsAppInbox()">
+                        <i class="fa-solid fa-trash-can"></i> Vaciar bandeja
+                    </button>
+                </div>
+                <div>
+                    <button class="btn-secondary" onclick="window.closeWhatsAppInbox()">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgARGBJBQUFCMjk0OEFFRDE3QUFGQ0UA",
+    "from": "34910871265",
+    "senderName": "Amazon España",
+    "type": "unsupported",
+    "text": "⚠️ [CÓDIGO AMAZON / OTP RECIBIDO]: Amazon envió un código de verificación protegido por plantilla que WhatsApp Cloud API clasifica como no soportado (código 131051 de Meta). Para iniciar sesión en Amazon, pulsa en 'Enviar código por SMS' o 'Llamada telefónica' en Amazon para recibirlo en tu móvil físico.",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": true,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": [
+      {
+        "code": 131051,
+        "title": "Unsupported message type",
+        "message": "Unsupported message type"
+      }
+    ],
+    "date": "2026-10-13T13:45:00.000Z",
+    "timestamp": 1791899100000
+  }
+]

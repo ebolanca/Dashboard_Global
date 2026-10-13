@@ -653,3 +653,294 @@ window.closeBotModal = () => {
 
 // Iniciar aplicación
 init();
+
+// ==========================================
+// BANDEJA DE ENTRADA WHATSAPP META (INBOX)
+// ==========================================
+
+let whatsappInboxMessages = [];
+let whatsappInboxFilter = 'all';
+let whatsappInboxInterval = null;
+
+window.openWhatsAppInbox = function() {
+    const modal = document.getElementById('whatsapp-inbox-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    window.fetchWhatsAppInbox(true);
+    
+    if (whatsappInboxInterval) clearInterval(whatsappInboxInterval);
+    whatsappInboxInterval = setInterval(() => {
+        window.fetchWhatsAppInbox(false);
+    }, 4000);
+};
+
+window.closeWhatsAppInbox = function() {
+    if (whatsappInboxInterval) {
+        clearInterval(whatsappInboxInterval);
+        whatsappInboxInterval = null;
+    }
+    const modal = document.getElementById('whatsapp-inbox-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.setInboxFilter = function(filter) {
+    whatsappInboxFilter = filter;
+    document.querySelectorAll('.inbox-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-inbox-filter') === filter);
+    });
+    window.renderWhatsAppInbox();
+};
+
+window.fetchWhatsAppInbox = async function(showSpinner = false) {
+    const container = document.getElementById('whatsapp-inbox-content');
+    if (showSpinner && container) {
+        container.innerHTML = '<div class="spinner"></div>';
+    }
+
+    try {
+        const url = (config && config.pcName === 'MSI')
+            ? `http://${config.remoteServerIp}:4000/api/whatsapp/inbox`
+            : '/api/whatsapp/inbox';
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        whatsappInboxMessages = await res.json();
+
+        // Actualizar contadores
+        const total = whatsappInboxMessages.length;
+        const otpCount = whatsappInboxMessages.filter(m => m.isOtp).length;
+        const mediaCount = whatsappInboxMessages.filter(m => m.mediaUrl || m.type === 'image' || m.type === 'document').length;
+        const guestCount = whatsappInboxMessages.filter(m => !m.isOtp && m.from !== '34910871265').length;
+
+        const countBadge = document.getElementById('whatsapp-inbox-count');
+        if (countBadge) {
+            countBadge.innerText = total;
+            countBadge.style.display = total > 0 ? 'inline-block' : 'none';
+        }
+
+        const elAll = document.getElementById('inbox-count-all');
+        if (elAll) elAll.innerText = total;
+        const elOtp = document.getElementById('inbox-count-otp');
+        if (elOtp) elOtp.innerText = otpCount;
+        const elMedia = document.getElementById('inbox-count-media');
+        if (elMedia) elMedia.innerText = mediaCount;
+        const elGuest = document.getElementById('inbox-count-guest');
+        if (elGuest) elGuest.innerText = guestCount;
+
+        window.renderWhatsAppInbox();
+    } catch (e) {
+        console.error('Error fetching whatsapp inbox:', e);
+        if (container && showSpinner) {
+            container.innerHTML = `<div class="inbox-empty"><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i><p>No se pudo conectar con el servidor de WhatsApp.</p></div>`;
+        }
+    }
+};
+
+window.renderWhatsAppInbox = function() {
+    const container = document.getElementById('whatsapp-inbox-content');
+    if (!container) return;
+
+    const searchInput = document.getElementById('inbox-search-input');
+    const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+    let list = [...whatsappInboxMessages];
+
+    // Aplicar filtro de categoría
+    if (whatsappInboxFilter === 'otp') {
+        list = list.filter(m => m.isOtp);
+    } else if (whatsappInboxFilter === 'media') {
+        list = list.filter(m => m.mediaUrl || m.type === 'image' || m.type === 'document');
+    } else if (whatsappInboxFilter === 'guest') {
+        list = list.filter(m => !m.isOtp && m.from !== '34910871265');
+    }
+
+    // Aplicar filtro de búsqueda
+    if (query) {
+        list = list.filter(m => 
+            (m.from && m.from.includes(query)) ||
+            (m.senderName && m.senderName.toLowerCase().includes(query)) ||
+            (m.text && m.text.toLowerCase().includes(query)) ||
+            (m.otpCode && m.otpCode.toLowerCase().includes(query))
+        );
+    }
+
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="inbox-empty">
+                <i class="fa-brands fa-whatsapp"></i>
+                <p>No hay mensajes en esta bandeja todavía.</p>
+                <span style="font-size: 0.78rem; opacity: 0.7;">Los mensajes entrantes de Meta se registrarán aquí en tiempo real.</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = list.map(m => {
+        const isAmazon = m.from === '34910871265' || (m.senderName && m.senderName.includes('Amazon'));
+        const dateObj = new Date(m.timestamp || m.date);
+        const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+        
+        // Tiempo relativo
+        const diffMs = Date.now() - dateObj.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        let timeAgo = `${dateStr} ${timeStr}`;
+        if (diffMin < 1) timeAgo = 'Hace unos instantes';
+        else if (diffMin < 60) timeAgo = `Hace ${diffMin} min (${timeStr})`;
+        else if (diffMin < 1440) timeAgo = `Hoy a las ${timeStr}`;
+
+        // Tag según tipo
+        let typeBadge = '';
+        if (isAmazon || m.isOtp) {
+            typeBadge = `<span class="inbox-type-tag ${isAmazon ? 'tag-amazon' : 'tag-otp'}"><i class="fa-solid fa-key"></i> OTP / SEGURIDAD</span>`;
+        } else if (m.mediaUrl || m.type === 'image') {
+            typeBadge = `<span class="inbox-type-tag tag-image"><i class="fa-solid fa-image"></i> IMAGEN</span>`;
+        } else {
+            typeBadge = `<span class="inbox-type-tag tag-text"><i class="fa-solid fa-message"></i> TEXTO</span>`;
+        }
+
+        // Avatar
+        let avatarHtml = `<div class="inbox-avatar ${isAmazon ? 'avatar-amazon' : ''}"><i class="${isAmazon ? 'fa-brands fa-amazon' : 'fa-solid fa-user'}"></i></div>`;
+
+        // Renderizado especial si es OTP
+        let otpBox = '';
+        if (m.otpCode) {
+            otpBox = `
+                <div class="otp-box-display">
+                    <div>
+                        <div style="font-size: 0.75rem; color: #f59e0b; font-weight: 700; text-transform: uppercase;">
+                            <i class="fa-solid fa-shield-halved"></i> Código de Verificación Detectado
+                        </div>
+                        <div class="otp-code-value">${m.otpCode}</div>
+                    </div>
+                    <button class="btn-copy-otp" onclick="window.copyOtp('${m.otpCode}', this)">
+                        <i class="fa-solid fa-copy"></i> Copiar código
+                    </button>
+                </div>
+            `;
+        }
+
+        // Renderizado especial si es Imagen
+        let mediaHtml = '';
+        if (m.mediaUrl) {
+            const mediaFullUrl = (config && config.pcName === 'MSI') 
+                ? `http://${config.remoteServerIp}:4000${m.mediaUrl}` 
+                : m.mediaUrl;
+            mediaHtml = `
+                <div class="inbox-image-wrapper">
+                    <a href="${mediaFullUrl}" target="_blank" title="Hacer clic para ver en tamaño completo">
+                        <img src="${mediaFullUrl}" alt="Foto WhatsApp" class="inbox-img-thumb" loading="lazy">
+                    </a>
+                    <div class="inbox-image-actions">
+                        <a href="${mediaFullUrl}" target="_blank" class="btn-view-img">
+                            <i class="fa-solid fa-up-right-from-square"></i> Ver en grande
+                        </a>
+                        <a href="${mediaFullUrl}" download class="btn-view-img" style="color: #10b981;">
+                            <i class="fa-solid fa-download"></i> Descargar
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Aviso especial si es mensaje unsupported de Amazon
+        let amazonAlert = '';
+        if (isAmazon && m.type === 'unsupported') {
+            amazonAlert = `
+                <div class="inbox-alert-amazon">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 1.2rem; margin-top: 2px;"></i>
+                    <div>
+                        <strong>¿Por qué no aparece el código en texto plano?</strong><br>
+                        Meta WhatsApp Cloud API no expone el contenido de plantillas de autenticación protegidas de otras empresas (código 131051 de Meta).<br>
+                        👉 <strong>Solución inmediata:</strong> En la web de Amazon, pulsa en <em>"Probar de otra manera"</em> y selecciona <strong>"Enviar código por SMS"</strong> o <strong>"Llamada telefónica"</strong> para recibir el código normal en tu móvil.
+                    </div>
+                </div>
+            `;
+        }
+
+        const senderDisplay = m.senderName ? `${m.senderName}` : `+${m.from}`;
+        const phoneSub = m.senderName ? `<span class="inbox-sender-phone">+${m.from}</span>` : '';
+
+        return `
+            <div class="inbox-card ${isAmazon ? 'card-amazon' : (m.isOtp ? 'card-otp' : (m.mediaUrl ? 'card-media' : ''))}">
+                <div class="inbox-card-header">
+                    <div class="inbox-sender-info">
+                        ${avatarHtml}
+                        <div>
+                            <span class="inbox-sender-name">${senderDisplay}</span>
+                            ${phoneSub}
+                        </div>
+                    </div>
+                    <div class="inbox-meta-right">
+                        ${typeBadge}
+                        <span class="inbox-time">${timeAgo}</span>
+                    </div>
+                </div>
+
+                <div class="inbox-card-body">
+                    ${m.text ? `<div style="white-space: pre-wrap;">${m.text}</div>` : ''}
+                    ${otpBox}
+                    ${mediaHtml}
+                    ${amazonAlert}
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+window.copyOtp = function(code, btn) {
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+        btn.style.background = '#10b981';
+        btn.style.color = '#fff';
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.style.background = '';
+            btn.style.color = '';
+        }, 2000);
+    }).catch(err => {
+        alert('Código: ' + code);
+    });
+};
+
+window.clearWhatsAppInbox = async function() {
+    if (!confirm('¿Estás seguro de que deseas vaciar todos los mensajes de esta bandeja?')) return;
+    try {
+        const url = (config && config.pcName === 'MSI')
+            ? `http://${config.remoteServerIp}:4000/api/whatsapp/inbox`
+            : '/api/whatsapp/inbox';
+
+        const res = await fetch(url, { method: 'DELETE' });
+        if (res.ok) {
+            whatsappInboxMessages = [];
+            window.renderWhatsAppInbox();
+            const badge = document.getElementById('whatsapp-inbox-count');
+            if (badge) badge.style.display = 'none';
+        }
+    } catch (e) {
+        alert('Error al vaciar bandeja.');
+    }
+};
+
+// Comprobación periódica en segundo plano para el contador de la cabecera
+setInterval(() => {
+    if (!document.getElementById('whatsapp-inbox-modal') || document.getElementById('whatsapp-inbox-modal').style.display !== 'flex') {
+        const url = (config && config.pcName === 'MSI')
+            ? `http://${config.remoteServerIp}:4000/api/whatsapp/inbox`
+            : '/api/whatsapp/inbox';
+
+        fetch(url).then(r => r.json()).then(list => {
+            if (Array.isArray(list)) {
+                whatsappInboxMessages = list;
+                const badge = document.getElementById('whatsapp-inbox-count');
+                if (badge) {
+                    badge.innerText = list.length;
+                    badge.style.display = list.length > 0 ? 'inline-block' : 'none';
+                }
+            }
+        }).catch(() => {});
+    }
+}, 30000);
+
