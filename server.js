@@ -503,9 +503,11 @@ app.post('/api/projects/pull-all', async (req, res) => {
 function generateChangesSummary(targetPath) {
     try {
         const { execSync } = require('child_process');
+        const execOpts = { cwd: targetPath, encoding: 'utf8', timeout: 6000, windowsHide: true, maxBuffer: 1024 * 1024 };
+        
         let aheadCommits = [];
         try {
-            const cherry = execSync('git log origin/main..HEAD --oneline', { cwd: targetPath, encoding: 'utf8', timeout: 5000 }).trim();
+            const cherry = execSync('git log origin/main..HEAD --oneline', execOpts).trim();
             if (cherry) {
                 aheadCommits = cherry.split('\n').map(l => l.replace(/^[a-f0-9]+\s+/, '').trim()).filter(Boolean);
             }
@@ -513,7 +515,7 @@ function generateChangesSummary(targetPath) {
 
         let porcelain = '';
         try {
-            porcelain = execSync('git status --porcelain', { cwd: targetPath, encoding: 'utf8', timeout: 5000 }).trim();
+            porcelain = execSync('git status --porcelain', execOpts).trim();
         } catch (e) {}
 
         const statusLines = porcelain ? porcelain.split('\n').map(l => l.trim()).filter(Boolean) : [];
@@ -521,13 +523,19 @@ function generateChangesSummary(targetPath) {
         const addedFiles = [];
         const deletedFiles = [];
 
+        // Ignorar bases de datos locales, cachés dinámicos, temporales y locks
+        const ignoredPatterns = [
+            'data/', 'metadata_cache', 'radio_airplay', 'analyses_db', 'lyrics_',
+            '.cache', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'node_modules/'
+        ];
+
         for (const line of statusLines) {
             const status = line.substring(0, 2).trim();
             const file = line.substring(2).trim();
-            if (file.toLowerCase().includes('data/') || file.includes('metadata_cache') || file.includes('lyrics_')) continue;
+            const lower = file.toLowerCase();
+            if (ignoredPatterns.some(p => lower.includes(p))) continue;
             
-            if (status.includes('M')) modifiedFiles.push(file);
-            else if (status.includes('?') || status.includes('A')) addedFiles.push(file);
+            if (status.includes('?') || status.includes('A')) addedFiles.push(file);
             else if (status.includes('D')) deletedFiles.push(file);
             else modifiedFiles.push(file);
         }
@@ -539,7 +547,7 @@ function generateChangesSummary(targetPath) {
             return "Actualización y sincronización de versión";
         }
 
-        // 2. Si solo hay commits pendientes de push
+        // 2. Si solo hay commits pendientes de push (sin cambios en working tree)
         if (allTouchedFiles.length === 0 && aheadCommits.length > 0) {
             if (aheadCommits.length === 1) {
                 return aheadCommits[0].replace(/^v\d+[\.\d]*:\s*/i, '');
@@ -547,48 +555,169 @@ function generateChangesSummary(targetPath) {
             return `Sincronizar ${aheadCommits.length} commits pendientes (${aheadCommits.slice(0, 2).join(', ')})`;
         }
 
-        // 3. Analizar qué tipo de archivos se han tocado
-        const basenames = allTouchedFiles.map(f => path.basename(f));
-        const hasCss = allTouchedFiles.some(f => f.endsWith('.css'));
-        const hasHtml = allTouchedFiles.some(f => f.endsWith('.html'));
-        const hasJs = allTouchedFiles.some(f => f.endsWith('.js') || f.endsWith('.ts'));
-        const hasPkg = allTouchedFiles.some(f => f.includes('package.json') || f.includes('manifest.json'));
+        // Separar archivos funcionales de archivos puramente de configuración/versión
+        const isConfigFile = (f) => /package\.json$|manifest\.json$|version\.json$|sync_version\.js$/i.test(f);
+        const functionalFiles = allTouchedFiles.filter(f => !isConfigFile(f));
+        const effectiveFiles = functionalFiles.length > 0 ? functionalFiles : allTouchedFiles;
+        const basenames = effectiveFiles.map(f => path.basename(f));
 
-        // Leer git diff resumido para captar contexto
+        // Leer git diff (para archivos modificados y staged) pasando solo archivos efectivos para evitar desbordar búfer con BDs o cachés
         let diffText = '';
         try {
-            diffText = execSync('git diff -U0', { cwd: targetPath, encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 512 });
-        } catch (e) {}
-
-        const details = [];
-        if (diffText.includes('deploy') || diffText.includes('openDeployModal')) details.push('modal de despliegue');
-        if (diffText.includes('status') || diffText.includes('badge') || diffText.includes('pulse')) details.push('indicadores de estado y animaciones');
-        if (diffText.includes('version') || diffText.includes('calculateNextVersion')) details.push('sistema de versiones');
-        if (diffText.includes('filter') || diffText.includes('search') || diffText.includes('loading')) details.push('filtros y estado de carga');
-        if (diffText.includes('bot') || diffText.includes('pm2')) details.push('gestión de bots');
-
-        let summary = '';
-        if (details.length > 0) {
-            const detailsStr = details.slice(0, 2).join(' y ');
-            if (basenames.length <= 3) {
-                summary = `Ajustes en ${detailsStr} (${basenames.join(', ')})`;
-            } else {
-                summary = `Ajustes en ${detailsStr} en ${basenames.length} archivos`;
+            const filesArg = effectiveFiles.length > 0 && effectiveFiles.length <= 15
+                ? '-- ' + effectiveFiles.map(f => `"${f.replace(/"/g, '')}"`).join(' ')
+                : '';
+            diffText = execSync(`git diff -U0 ${filesArg}`, execOpts);
+            if (!diffText || diffText.trim().length === 0) {
+                diffText = execSync(`git diff --cached -U0 ${filesArg}`, execOpts);
             }
-        } else if (basenames.length === 1) {
-            const f = basenames[0];
-            if (hasCss) summary = `Ajustes de estilos y diseño en ${f}`;
-            else if (hasHtml) summary = `Actualización de interfaz en ${f}`;
-            else if (hasPkg) summary = `Actualización de versión y configuración en ${f}`;
-            else summary = `Mejoras y correcciones en ${f}`;
-        } else if (basenames.length <= 3) {
-            summary = `Actualización en ${basenames.join(', ')}`;
-        } else {
-            const types = [];
-            if (hasJs) types.push('lógica');
-            if (hasCss) types.push('estilos');
-            if (hasHtml) types.push('interfaz');
-            summary = `Ajustes en ${types.join(', ') || 'archivos'} (${basenames.length} archivos modificados)`;
+        } catch (e) {
+            try {
+                diffText = execSync('git diff -U0', execOpts);
+            } catch (err2) {}
+        }
+
+        // Extraer líneas agregadas/modificadas (las que empiezan por '+', ignorando cabeceras '+++')
+        const addedLines = diffText
+            .split('\n')
+            .filter(l => l.startsWith('+') && !l.startsWith('+++'))
+            .map(l => l.substring(1).trim());
+
+        // 3. PRIORIDAD ALTA: ¿Hay comentarios descriptivos recién añadidos en el código?
+        // Ej: // Redirigir directo a la app principal si ya hay sesión activa
+        let extractedComment = null;
+        for (const line of addedLines) {
+            const commentMatch = line.match(/^(\/\/|#|\/\*|\*|<!--)\s*([A-ZÁÉÍÓÚ][^\n\r*#<>]{10,90})/iu);
+            if (commentMatch) {
+                const text = commentMatch[2].trim().replace(/(-->|\*\/)$/, '').trim();
+                // Ignorar comentarios genéricos como 'TODO', 'eslint', 'prettier', etc.
+                if (!/^(todo|fixme|eslint|prettier|copyright|license|import|export|debugger)/i.test(text)) {
+                    extractedComment = text;
+                    break;
+                }
+            }
+        }
+
+        // 4. ANÁLISIS SEMÁNTICO POR DOMINIO / INTENCIÓN
+        const fullContent = (diffText + '\n' + allTouchedFiles.join('\n')).toLowerCase();
+        const detectedActions = [];
+
+        // A. Autenticación y Sesión
+        if (fullContent.includes('session-info') || fullContent.includes('session') || fullContent.includes('login') || fullContent.includes('logout') || fullContent.includes('auth')) {
+            if (fullContent.includes('location.href') || fullContent.includes('redirect') || fullContent.includes('redirig')) {
+                detectedActions.push('redirección automática y control de sesión');
+            } else {
+                detectedActions.push('autenticación y gestión de sesiones');
+            }
+        }
+
+        // B. Extensiones de Navegador y Portapapeles
+        if (fullContent.includes('clipboard') || fullContent.includes('navigator.clipboard') || fullContent.includes('copiar')) {
+            detectedActions.push('copia al portapapeles');
+        }
+        if (allTouchedFiles.some(f => f.toLowerCase().includes('extension')) || fullContent.includes('chrome.storage') || fullContent.includes('chrome.runtime')) {
+            detectedActions.push('extensión de navegador');
+        }
+
+        // C. Scroll, Historial, Borrado en UI
+        if (fullContent.includes('scroll') || fullContent.includes('overflow-y')) {
+            detectedActions.push('desplazamiento y scroll en interfaz');
+        }
+        if (fullContent.includes('delete') || fullContent.includes('remove') || fullContent.includes('borrar') || fullContent.includes('limpiar')) {
+            detectedActions.push('eliminación de elementos');
+        }
+
+        // D. Reproductor Multimedia / Música / Video
+        if (fullContent.includes('player') || fullContent.includes('audio') || fullContent.includes('videoclip') || fullContent.includes('track') || fullContent.includes('playlist')) {
+            detectedActions.push('reproductor multimedia y listas');
+        }
+
+        // E. Despliegue, Modales, Estado de Sistema
+        if (fullContent.includes('deploy') || fullContent.includes('opendeploymodal')) {
+            detectedActions.push('modal y flujo de despliegue');
+        }
+        if (fullContent.includes('status') || fullContent.includes('badge') || fullContent.includes('pulse')) {
+            detectedActions.push('indicadores de estado');
+        }
+        if (fullContent.includes('windowshide') || fullContent.includes('silencios')) {
+            detectedActions.push('ejecución silenciosa');
+        }
+
+        // F. Búsqueda y Filtros
+        if (fullContent.includes('filter') || fullContent.includes('search') || fullContent.includes('buscador')) {
+            detectedActions.push('búsqueda y filtros');
+        }
+
+        // G. WhatsApp / Bots / PM2
+        if (fullContent.includes('whatsapp') || fullContent.includes('bot') || fullContent.includes('pm2')) {
+            detectedActions.push('gestión de bots y mensajería');
+        }
+
+        // H. Notificaciones y Alertas
+        if (fullContent.includes('toast') || fullContent.includes('alert(') || fullContent.includes('notific')) {
+            detectedActions.push('sistema de alertas y avisos');
+        }
+
+        // I. Firebase / Base de Datos
+        if (fullContent.includes('firestore') || fullContent.includes('collection(') || fullContent.includes('getdoc(')) {
+            detectedActions.push('consultas y persistencia de datos');
+        }
+
+        // J. Archivos Nuevos o Eliminados
+        if (addedFiles.length > 0 && deletedFiles.length === 0) {
+            const addedNames = addedFiles.map(f => path.basename(f)).slice(0, 2).join(', ');
+            detectedActions.push(`nuevo componente (${addedNames})`);
+        }
+        if (deletedFiles.length > 0) {
+            const delNames = deletedFiles.map(f => path.basename(f)).slice(0, 2).join(', ');
+            detectedActions.push(`eliminación de ${delNames}`);
+        }
+
+        // 5. GENERAR EL MENSAJE
+        let summary = '';
+
+        if (extractedComment) {
+            const cleanComment = extractedComment.charAt(0).toUpperCase() + extractedComment.slice(1);
+            if (cleanComment.length > 15 && cleanComment.length < 80) {
+                summary = cleanComment;
+            }
+        }
+
+        if (!summary && detectedActions.length > 0) {
+            const topActions = Array.from(new Set(detectedActions)).slice(0, 2).join(' y ');
+            const mainAction = topActions.charAt(0).toUpperCase() + topActions.slice(1);
+            
+            if (basenames.length === 1) {
+                summary = `${mainAction} en ${basenames[0]}`;
+            } else if (basenames.length <= 3) {
+                summary = `${mainAction} (${basenames.join(', ')})`;
+            } else {
+                summary = `${mainAction} en ${basenames.length} archivos`;
+            }
+        }
+
+        // Fallback por tipo de archivos funcionales
+        if (!summary) {
+            const hasCss = effectiveFiles.some(f => f.endsWith('.css'));
+            const hasHtml = effectiveFiles.some(f => f.endsWith('.html'));
+            const hasJs = effectiveFiles.some(f => f.endsWith('.js') || f.endsWith('.ts'));
+
+            if (basenames.length === 1) {
+                const f = basenames[0];
+                if (hasCss) summary = `Ajustes de estilos y diseño visual en ${f}`;
+                else if (hasHtml) summary = `Actualización de interfaz y estructura en ${f}`;
+                else if (hasJs) summary = `Mejoras en la lógica y funcionalidad de ${f}`;
+                else summary = `Actualización de ${f}`;
+            } else if (basenames.length <= 3) {
+                const parts = [];
+                if (hasJs) parts.push('lógica');
+                if (hasHtml) parts.push('interfaz');
+                if (hasCss) parts.push('estilos');
+                const category = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+                summary = `Ajustes en ${basenames.join(', ')}${category}`;
+            } else {
+                summary = `Actualización y optimizaciones en ${basenames.length} archivos`;
+            }
         }
 
         if (aheadCommits.length > 0) {
@@ -634,12 +763,13 @@ app.post('/api/projects/deploy', async (req, res) => {
 
         const projectConfig = config[folderName];
         const { execSync } = require('child_process');
+        const execOpts = { cwd: targetPath, windowsHide: true };
         
         console.log(`🚀 Iniciando proceso para ${folderName} v${version}`);
         
         // 1. Sincronizar versión (si el script existe)
         if (fs.existsSync(path.join(targetPath, 'scripts/sync_version.js'))) {
-            execSync(`node scripts/sync_version.js ${version}`, { cwd: targetPath });
+            execSync(`node scripts/sync_version.js ${version}`, execOpts);
         } else {
             const pkgP = path.join(targetPath, 'package.json');
             if (fs.existsSync(pkgP)) {
@@ -678,7 +808,7 @@ app.post('/api/projects/deploy', async (req, res) => {
             }
 
             const deployCmd = `npx.cmd -y firebase-tools deploy --only ${projectConfig.site} --project ${projectConfig.project} --token "${token}"`;
-            execSync(deployCmd, { cwd: targetPath });
+            execSync(deployCmd, execOpts);
         } else {
             console.log(`ℹ️ Proyecto sin Firebase configurado. Saltando a Git Push.`);
         }
@@ -688,16 +818,16 @@ app.post('/api/projects/deploy', async (req, res) => {
         const cleanVersion = version.replace(/^v/, '').trim();
         const commitMsg = `v${cleanVersion}: ${finalSummary}`; 
         if (fs.existsSync(path.join(targetPath, 'scripts/git_push.js'))) {
-            execSync(`node scripts/git_push.js "${commitMsg}"`, { cwd: targetPath });
+            execSync(`node scripts/git_push.js "${commitMsg}"`, execOpts);
         } else {
             // Backup por si no hay script: commit directo
-            execSync('git add .', { cwd: targetPath });
+            execSync('git add .', execOpts);
             try {
-                execSync(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, { cwd: targetPath });
+                execSync(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, execOpts);
             } catch (commitErr) {
                 console.log(`ℹ️ Git commit: ${commitErr.message}`);
             }
-            execSync('git push origin main', { cwd: targetPath });
+            execSync('git push origin main', execOpts);
         }
 
         res.json({ success: true });
