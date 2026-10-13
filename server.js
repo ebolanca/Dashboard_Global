@@ -684,13 +684,19 @@ app.post('/api/projects/deploy', async (req, res) => {
         }
         
         // 3. Git Push con el formato del usuario: "vX.XX: Resumen"
-        const commitMsg = `v${version.replace('v', '')}: ${finalSummary}`; 
+        const finalSummary = (summary || '').trim() || 'Actualización de versión';
+        const cleanVersion = version.replace(/^v/, '').trim();
+        const commitMsg = `v${cleanVersion}: ${finalSummary}`; 
         if (fs.existsSync(path.join(targetPath, 'scripts/git_push.js'))) {
             execSync(`node scripts/git_push.js "${commitMsg}"`, { cwd: targetPath });
         } else {
             // Backup por si no hay script: commit directo
             execSync('git add .', { cwd: targetPath });
-            execSync(`git commit -m "${commitMsg}"`, { cwd: targetPath });
+            try {
+                execSync(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, { cwd: targetPath });
+            } catch (commitErr) {
+                console.log(`ℹ️ Git commit: ${commitErr.message}`);
+            }
             execSync('git push origin main', { cwd: targetPath });
         }
 

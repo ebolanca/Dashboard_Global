@@ -631,7 +631,8 @@ window.confirmDeploy = async (name) => {
             window.closeModal();
             fetchData();
         } else {
-            alert("Fallo en la operación. Revisa la consola del servidor.");
+            const errData = await res.json().catch(() => ({}));
+            alert("Fallo en la operación: " + (errData.details || errData.error || "Revisa la consola del servidor."));
         }
     } catch (e) {
         console.error(e);
