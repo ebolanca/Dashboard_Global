@@ -148,6 +148,16 @@ app.get('/api/diag', (req, res) => {
     });
 });
 
+app.post('/api/display/mode', (req, res) => {
+    const mode = req.body.mode || 'internal';
+    const { exec } = require('child_process');
+    console.log(`[DISPLAY] Switching display mode to /${mode}`);
+    exec(`DisplaySwitch.exe /${mode}`, (err, stdout, stderr) => {
+        if (err) return res.status(500).json({ error: err.message, stderr });
+        res.json({ success: true, mode });
+    });
+});
+
 app.get('/api/pm2/log-tail', (req, res) => {
     const fs = require('fs');
     const path = require('path');
