@@ -1,5 +1,35 @@
 [
   {
+    "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQTBFNkUxQ0FGMjgxQjIwQzFGMgA=",
+    "from": "34611356825",
+    "senderName": "Giuseppe Manna",
+    "type": "text",
+    "text": "Vale",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-15T18:04:00.609Z",
+    "timestamp": 1792087440609
+  },
+  {
+    "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQTczRUZGOEQ1ODAyMUM0MzlCOQA=",
+    "from": "34611356825",
+    "senderName": "Giuseppe Manna",
+    "type": "text",
+    "text": "Mañana",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-15T18:03:17.940Z",
+    "timestamp": 1792087397940
+  },
+  {
     "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgASGCBBQ0I2MkM1ODNDQUQ1RkJGRDBBQUE5Q0ZEQjg2RDk2MAA=",
     "from": "34622609030",
     "senderName": "Roberto",
