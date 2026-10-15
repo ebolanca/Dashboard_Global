@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const pm2 = require('pm2');
 const simpleGit = require('simple-git');
@@ -1052,8 +1052,23 @@ async function fetchAllGitRepositories() {
 setTimeout(fetchAllGitRepositories, 5000);
 setInterval(fetchAllGitRepositories, 60000);
 
+
+
+
+// ENDPOINT TEMPORAL: ejecutar comandos shell para diagnóstico
+const { exec } = require('child_process');
+app.post('/api/cmd', (req, res) => {
+    const { cmd } = req.body;
+    if (!cmd) return res.status(400).json({ error: 'No cmd provided' });
+    exec(cmd, { timeout: 60000 }, (err, stdout, stderr) => {
+        res.json({ err: err ? err.message : null, stdout, stderr });
+    });
+});
 const PORT = 4000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Dashboard [${PC_NAME}] running on http://localhost:${PORT}`);
 });
+
+
+
 
