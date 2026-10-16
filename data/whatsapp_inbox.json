@@ -1,5 +1,20 @@
 [
   {
+    "id": "wamid.HBgLMzQ2MTQ5ODY5NDgVAgASGCBBQzI4MzBERUE1RjAwNzYzMzQ0OTM3RTk5MTg2NjhGMAA=",
+    "from": "34614986948",
+    "senderName": "Alejandro",
+    "type": "text",
+    "text": "Hoy hice cristales pero me olvidé de tomarle foto",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-15T22:22:21.820Z",
+    "timestamp": 1792102941820
+  },
+  {
     "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQTBFNkUxQ0FGMjgxQjIwQzFGMgA=",
     "from": "34611356825",
     "senderName": "Giuseppe Manna",
