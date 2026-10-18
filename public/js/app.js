@@ -326,6 +326,47 @@ async function init() {
             border: 1px solid rgba(168, 85, 247, 0.3);
             color: #c084fc;
         }
+
+        /* Ocultar píldoras redundantes y expandir toolbar */
+        .filter-pills {
+            display: none !important;
+        }
+        .toolbar-actions {
+            width: 100% !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            gap: 12px !important;
+        }
+        .search-box {
+            flex: 1 !important;
+            max-width: 450px !important;
+        }
+
+        /* Tarjetas KPI como filtros principales */
+        .kpi-card {
+            cursor: pointer !important;
+            user-select: none;
+        }
+        .kpi-card.active {
+            border-color: var(--accent) !important;
+            background: rgba(56, 189, 248, 0.09) !important;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) !important;
+        }
+        .kpi-card.active::before {
+            background: var(--accent) !important;
+        }
+        .kpi-card.kpi-card-warning.has-pending {
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+        .kpi-card.kpi-card-warning.has-pending.active {
+            border-color: #f59e0b !important;
+            background: rgba(245, 158, 11, 0.09) !important;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.3) !important;
+        }
+        .kpi-card.kpi-card-warning.has-pending.active::before {
+            background: #f59e0b !important;
+        }
     `;
     document.head.appendChild(dynamicStyles);
 
@@ -592,73 +633,69 @@ function renderKPICards(pendingProjects, pendingBots) {
     // Métricas calculadas
     const totalBots = allBots.length;
     const onlineBots = allBots.filter(b => b.status === 'online').length;
-    const allBotsOnline = totalBots > 0 && onlineBots === totalBots;
-    
     const totalMem = allBots.reduce((sum, b) => sum + (b.memory || 0), 0);
     const totalProjects = allProjects.length;
-    const pendingCount = (pendingProjects || []).length;
-    
-    const nodeName = config.pcName || 'Servidor';
-    const isMSI = nodeName === 'MSI';
-    const nodePort = isMSI ? 'localhost:4000' : '100.95.217.45:4000';
+    const pendingProjectsCount = (pendingProjects || []).length;
+    const pendingBotsCount = (pendingBots || []).length;
+    const totalPending = pendingProjectsCount + pendingBotsCount;
 
     kpiContainer.innerHTML = `
-        <!-- KPI 1: Bots y Servicios PM2 -->
-        <div class="kpi-card interactive" onclick="window.setFilterFromKPI('bots')" title="Filtrar por Bots PM2">
+        <!-- KPI 1: Vista Global (Todos) -->
+        <div class="kpi-card ${currentFilter === 'all' ? 'active' : ''}" onclick="window.setFilterFromKPI('all')" title="Mostrar todos los proyectos y bots">
             <div class="kpi-card-header">
-                <span class="kpi-label">Servicios PM2</span>
-                <div class="kpi-icon" style="color: #22c55e;"><i class="fa-solid fa-robot"></i></div>
+                <span class="kpi-label">Vista Global</span>
+                <div class="kpi-icon" style="color: #38bdf8;"><i class="fa-solid fa-layer-group"></i></div>
             </div>
             <div class="kpi-card-body">
-                <div class="kpi-value">${onlineBots} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">/ ${totalBots}</span></div>
-                <span class="kpi-badge ${allBotsOnline ? 'kpi-badge-success' : 'kpi-badge-danger'}">
-                    <i class="fa-solid ${allBotsOnline ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
-                    ${allBotsOnline ? 'Operativos' : `${totalBots - onlineBots} caído`}
+                <div class="kpi-value">${totalProjects + totalBots} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">activos</span></div>
+                <span class="kpi-badge kpi-badge-info">
+                    <i class="fa-solid fa-cubes"></i>
+                    ${totalProjects} repos • ${totalBots} bots
                 </span>
             </div>
         </div>
 
-        <!-- KPI 2: Memoria PM2 -->
-        <div class="kpi-card" title="Memoria RAM total consumida por procesos PM2">
-            <div class="kpi-card-header">
-                <span class="kpi-label">Memoria Bots</span>
-                <div class="kpi-icon" style="color: var(--accent);"><i class="fa-solid fa-memory"></i></div>
-            </div>
-            <div class="kpi-card-body">
-                <div class="kpi-value">${totalMem} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">MB</span></div>
-                <span class="kpi-badge ${totalMem > 300 ? 'kpi-badge-warning' : 'kpi-badge-info'}">
-                    <i class="fa-solid fa-microchip"></i>
-                    ${allBots.length} proceso${allBots.length === 1 ? '' : 's'}
-                </span>
-            </div>
-        </div>
-
-        <!-- KPI 3: Proyectos Git -->
-        <div class="kpi-card interactive" onclick="window.setFilterFromKPI('${pendingCount > 0 ? 'pending' : 'projects'}')" title="${pendingCount > 0 ? 'Ver cambios pendientes' : 'Ver todos los proyectos'}">
+        <!-- KPI 2: Proyectos Git -->
+        <div class="kpi-card ${currentFilter === 'projects' ? 'active' : ''}" onclick="window.setFilterFromKPI('projects')" title="Filtrar solo Proyectos GitHub">
             <div class="kpi-card-header">
                 <span class="kpi-label">Proyectos Git</span>
                 <div class="kpi-icon" style="color: #a855f7;"><i class="fa-solid fa-code-branch"></i></div>
             </div>
             <div class="kpi-card-body">
                 <div class="kpi-value">${totalProjects} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">repos</span></div>
-                <span class="kpi-badge ${pendingCount === 0 ? 'kpi-badge-success' : 'kpi-badge-warning'}">
-                    <i class="fa-solid ${pendingCount === 0 ? 'fa-check' : 'fa-arrows-rotate'}"></i>
-                    ${pendingCount === 0 ? 'Al día' : `${pendingCount} pendientes`}
+                <span class="kpi-badge ${pendingProjectsCount === 0 ? 'kpi-badge-success' : 'kpi-badge-warning'}">
+                    <i class="fa-solid ${pendingProjectsCount === 0 ? 'fa-check' : 'fa-arrows-rotate'}"></i>
+                    ${pendingProjectsCount === 0 ? 'Al día' : `${pendingProjectsCount} cambios`}
                 </span>
             </div>
         </div>
 
-        <!-- KPI 4: Nodo Activo -->
-        <div class="kpi-card" title="Host y dirección de la instancia actual">
+        <!-- KPI 3: Bots PM2 -->
+        <div class="kpi-card ${currentFilter === 'bots' ? 'active' : ''}" onclick="window.setFilterFromKPI('bots')" title="Filtrar solo Bots de WhatsApp PM2">
             <div class="kpi-card-header">
-                <span class="kpi-label">Nodo Activo</span>
-                <div class="kpi-icon" style="color: #38bdf8;"><i class="fa-solid ${isMSI ? 'fa-laptop' : 'fa-server'}"></i></div>
+                <span class="kpi-label">Bots PM2</span>
+                <div class="kpi-icon" style="color: #22c55e;"><i class="fa-solid fa-robot"></i></div>
             </div>
             <div class="kpi-card-body">
-                <div class="kpi-value">${nodeName}</div>
-                <span class="kpi-badge kpi-badge-purple">
-                    <i class="fa-solid fa-network-wired"></i>
-                    ${nodePort}
+                <div class="kpi-value">${onlineBots} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">/ ${totalBots}</span></div>
+                <span class="kpi-badge kpi-badge-success">
+                    <i class="fa-solid fa-memory"></i>
+                    ${totalMem} MB RAM
+                </span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Pendientes / Incidencias -->
+        <div class="kpi-card kpi-card-warning ${totalPending > 0 ? 'has-pending' : ''} ${currentFilter === 'pending' ? 'active' : ''}" onclick="window.setFilterFromKPI('pending')" title="Ver proyectos con cambios locales o bots caídos">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Pendientes</span>
+                <div class="kpi-icon" style="color: #f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+            <div class="kpi-card-body">
+                <div class="kpi-value">${totalPending} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">alertas</span></div>
+                <span class="kpi-badge ${totalPending === 0 ? 'kpi-badge-success' : 'kpi-badge-warning'}">
+                    <i class="fa-solid ${totalPending === 0 ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
+                    ${totalPending === 0 ? 'Sin cambios' : 'Requiere sync'}
                 </span>
             </div>
         </div>
@@ -667,10 +704,6 @@ function renderKPICards(pendingProjects, pendingBots) {
 
 window.setFilterFromKPI = function(filterName) {
     currentFilter = filterName;
-    const pillButtons = document.querySelectorAll('.pill-btn');
-    pillButtons.forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-filter') === filterName);
-    });
     applyFiltersAndRender();
 };
 
