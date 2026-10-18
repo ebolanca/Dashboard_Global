@@ -200,6 +200,132 @@ async function init() {
             from { opacity: 0; transform: translateY(15px) scale(0.95); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
+
+        /* KPI Bento Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        @media (max-width: 1024px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 640px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .kpi-card {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 12px;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: transparent;
+            transition: background 0.25s ease;
+        }
+        .kpi-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+        .kpi-card.interactive {
+            cursor: pointer;
+        }
+        .kpi-card.interactive:hover::before {
+            background: linear-gradient(90deg, var(--accent), transparent);
+        }
+        .kpi-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .kpi-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+        .kpi-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+        }
+        .kpi-card-body {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .kpi-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            line-height: 1;
+        }
+        .kpi-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .kpi-badge-success {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+        .kpi-badge-warning {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+        }
+        .kpi-badge-danger {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+        .kpi-badge-info {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: var(--accent);
+        }
+        .kpi-badge-purple {
+            background: rgba(168, 85, 247, 0.12);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            color: #c084fc;
+        }
     `;
     document.head.appendChild(dynamicStyles);
 
@@ -443,10 +569,110 @@ function applyFiltersAndRender() {
         if (emptyState) emptyState.style.display = 'none';
     }
 
-    // 6. Renderizar
+    // 6. Renderizar KPIs y listas
+    renderKPICards(pendingProjects, pendingBots);
     if (showProjects) renderProjects(filteredProjects);
     if (showBots) renderBots(filteredBots);
 }
+
+function renderKPICards(pendingProjects, pendingBots) {
+    let kpiContainer = document.getElementById('kpi-summary-container');
+    const mainContainer = document.querySelector('main.container');
+    const secProjects = document.getElementById('section-projects');
+
+    if (!kpiContainer && mainContainer && secProjects) {
+        kpiContainer = document.createElement('div');
+        kpiContainer.id = 'kpi-summary-container';
+        kpiContainer.className = 'kpi-grid';
+        mainContainer.insertBefore(kpiContainer, secProjects);
+    }
+
+    if (!kpiContainer) return;
+
+    // Métricas calculadas
+    const totalBots = allBots.length;
+    const onlineBots = allBots.filter(b => b.status === 'online').length;
+    const allBotsOnline = totalBots > 0 && onlineBots === totalBots;
+    
+    const totalMem = allBots.reduce((sum, b) => sum + (b.memory || 0), 0);
+    const totalProjects = allProjects.length;
+    const pendingCount = (pendingProjects || []).length;
+    
+    const nodeName = config.pcName || 'Servidor';
+    const isMSI = nodeName === 'MSI';
+    const nodePort = isMSI ? 'localhost:4000' : '100.95.217.45:4000';
+
+    kpiContainer.innerHTML = `
+        <!-- KPI 1: Bots y Servicios PM2 -->
+        <div class="kpi-card interactive" onclick="window.setFilterFromKPI('bots')" title="Filtrar por Bots PM2">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Servicios PM2</span>
+                <div class="kpi-icon" style="color: #22c55e;"><i class="fa-solid fa-robot"></i></div>
+            </div>
+            <div class="kpi-card-body">
+                <div class="kpi-value">${onlineBots} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">/ ${totalBots}</span></div>
+                <span class="kpi-badge ${allBotsOnline ? 'kpi-badge-success' : 'kpi-badge-danger'}">
+                    <i class="fa-solid ${allBotsOnline ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
+                    ${allBotsOnline ? 'Operativos' : `${totalBots - onlineBots} caído`}
+                </span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Memoria PM2 -->
+        <div class="kpi-card" title="Memoria RAM total consumida por procesos PM2">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Memoria Bots</span>
+                <div class="kpi-icon" style="color: var(--accent);"><i class="fa-solid fa-memory"></i></div>
+            </div>
+            <div class="kpi-card-body">
+                <div class="kpi-value">${totalMem} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">MB</span></div>
+                <span class="kpi-badge ${totalMem > 300 ? 'kpi-badge-warning' : 'kpi-badge-info'}">
+                    <i class="fa-solid fa-microchip"></i>
+                    ${allBots.length} proceso${allBots.length === 1 ? '' : 's'}
+                </span>
+            </div>
+        </div>
+
+        <!-- KPI 3: Proyectos Git -->
+        <div class="kpi-card interactive" onclick="window.setFilterFromKPI('${pendingCount > 0 ? 'pending' : 'projects'}')" title="${pendingCount > 0 ? 'Ver cambios pendientes' : 'Ver todos los proyectos'}">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Proyectos Git</span>
+                <div class="kpi-icon" style="color: #a855f7;"><i class="fa-solid fa-code-branch"></i></div>
+            </div>
+            <div class="kpi-card-body">
+                <div class="kpi-value">${totalProjects} <span style="font-size: 0.92rem; font-weight: 500; color: var(--text-dim);">repos</span></div>
+                <span class="kpi-badge ${pendingCount === 0 ? 'kpi-badge-success' : 'kpi-badge-warning'}">
+                    <i class="fa-solid ${pendingCount === 0 ? 'fa-check' : 'fa-arrows-rotate'}"></i>
+                    ${pendingCount === 0 ? 'Al día' : `${pendingCount} pendientes`}
+                </span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Nodo Activo -->
+        <div class="kpi-card" title="Host y dirección de la instancia actual">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Nodo Activo</span>
+                <div class="kpi-icon" style="color: #38bdf8;"><i class="fa-solid ${isMSI ? 'fa-laptop' : 'fa-server'}"></i></div>
+            </div>
+            <div class="kpi-card-body">
+                <div class="kpi-value">${nodeName}</div>
+                <span class="kpi-badge kpi-badge-purple">
+                    <i class="fa-solid fa-network-wired"></i>
+                    ${nodePort}
+                </span>
+            </div>
+        </div>
+    `;
+}
+
+window.setFilterFromKPI = function(filterName) {
+    currentFilter = filterName;
+    const pillButtons = document.querySelectorAll('.pill-btn');
+    pillButtons.forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-filter') === filterName);
+    });
+    applyFiltersAndRender();
+};
 
 function renderProjects(projects) {
     const grid = document.getElementById('projects-grid');
