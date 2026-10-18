@@ -327,20 +327,41 @@ async function init() {
             color: #c084fc;
         }
 
-        /* Ocultar píldoras redundantes y expandir toolbar */
+        /* Ocultar píldoras redundantes y organizar toolbar limpiamente */
         .filter-pills {
             display: none !important;
+        }
+        .toolbar {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex !important;
+            align-items: center !important;
         }
         .toolbar-actions {
             width: 100% !important;
             display: flex !important;
-            justify-content: space-between !important;
             align-items: center !important;
+            justify-content: flex-end !important;
             gap: 12px !important;
         }
         .search-box {
-            flex: 1 !important;
-            max-width: 450px !important;
+            margin-right: auto !important;
+            width: 340px !important;
+            max-width: 380px !important;
+        }
+        .search-box input {
+            width: 100% !important;
+            padding: 8px 36px 8px 34px !important;
+            font-size: 0.83rem !important;
+        }
+        .view-switch {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            flex-shrink: 0 !important;
+        }
+        .btn-sync-all, .btn-whatsapp-inbox {
+            flex-shrink: 0 !important;
         }
 
         /* Tarjetas KPI como filtros principales */
