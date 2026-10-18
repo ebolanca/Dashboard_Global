@@ -124,11 +124,13 @@ app.post('/api/paperless/restart', (req, res) => {
 });
 
 app.get('/api/docker/logs', (req, res) => {
-    const container = req.query.name || 'spotdl-sync';
-    const lines = req.query.lines || 30;
+    const container = req.query.name || 'paperless-ai';
+    const lines = req.query.lines || 150;
     const { exec } = require('child_process');
-    exec('docker logs --tail ' + lines + ' ' + container, (err, stdout, stderr) => {
-        res.json({ output: stdout || stderr || '' });
+    exec(`docker logs --tail ${lines} ${container}`, { windowsHide: true }, (err, stdout, stderr) => {
+        const fullOutput = (stdout || stderr || '').trim();
+        const logsArray = fullOutput ? fullOutput.split('\n') : [];
+        res.json({ output: fullOutput, logs: logsArray });
     });
 });
 

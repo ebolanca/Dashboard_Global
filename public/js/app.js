@@ -490,6 +490,63 @@ async function init() {
             margin-right: 6px;
             animation: pulseDot 2s infinite;
         }
+
+        /* Docker & Paperless AI Styles */
+        .docker-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .docker-all-bar {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+            margin-top: 6px;
+        }
+        .docker-all-bar:hover {
+            background: rgba(56, 189, 248, 0.05);
+            border-color: rgba(56, 189, 248, 0.3);
+            color: var(--accent);
+        }
+        .docker-pills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+            padding: 12px;
+            background: rgba(11, 15, 25, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            margin-top: 8px;
+        }
+        .docker-mini-pill {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            color: var(--text-main);
+        }
+        .docker-mini-pill.running .status-dot {
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
+        }
+        .docker-mini-pill.exited .status-dot {
+            background: #ef4444;
+        }
     `;
     document.head.appendChild(dynamicStyles);
 
@@ -610,6 +667,16 @@ async function fetchData() {
             }
         }
         allBots = uniqueBots.filter(b => b.name !== 'paperless-ai-watcher');
+
+        // Cargar estado de Docker si estamos en OMEN
+        if (config.pcName === 'OMEN') {
+            try {
+                const dockerRes = await fetch('/api/docker/status');
+                dockerStatusMap = await dockerRes.json();
+            } catch(e) {
+                console.warn('No se pudo consultar estado de Docker:', e);
+            }
+        }
 
         isInitialLoading = false;
         applyFiltersAndRender();
@@ -737,7 +804,228 @@ function applyFiltersAndRender() {
     renderKPICards(pendingProjects, pendingBots);
     if (showProjects) renderProjects(filteredProjects);
     if (showBots) renderBots(filteredBots);
+    renderDockerSection();
 }
+
+let isDockerOtherExpanded = false;
+
+function renderDockerSection() {
+    let dockerSection = document.getElementById('section-docker');
+    const mainContainer = document.querySelector('main.container');
+
+    // Regla estricta: Solo mostrar en OMEN y cuando no esté filtrado por proyectos o bots
+    if (config.pcName !== 'OMEN' || currentFilter === 'projects' || currentFilter === 'bots') {
+        if (dockerSection) dockerSection.style.display = 'none';
+        return;
+    }
+
+    if (!dockerSection && mainContainer) {
+        dockerSection = document.createElement('section');
+        dockerSection.id = 'section-docker';
+        dockerSection.className = 'dashboard-section';
+        mainContainer.appendChild(dockerSection);
+    }
+
+    if (!dockerSection) return;
+    dockerSection.style.display = 'block';
+
+    const mainServices = [
+        {
+            id: 'paperless-ai',
+            name: 'Paperless AI',
+            sub: 'Clasificador inteligente LLM',
+            icon: 'fa-solid fa-brain',
+            iconColor: '#c084fc',
+            url: 'http://100.95.217.45:3000',
+            hasLogs: true
+        },
+        {
+            id: 'paperless-webserver',
+            name: 'Paperless-ngx',
+            sub: 'Gestor documental digital',
+            icon: 'fa-solid fa-file-invoice',
+            iconColor: '#38bdf8',
+            url: 'http://100.95.217.45:8000',
+            hasLogs: true
+        },
+        {
+            id: 'paperless-ollama',
+            name: 'Paperless Ollama',
+            sub: 'Motor de inferencia LLM local',
+            icon: 'fa-solid fa-microchip',
+            iconColor: '#10b981',
+            url: null,
+            hasLogs: true
+        },
+        {
+            id: 'homeassistant',
+            name: 'Home Assistant',
+            sub: 'Domótica y automatizaciones del hogar',
+            icon: 'fa-solid fa-house-signal',
+            iconColor: '#0ea5e9',
+            url: 'http://100.95.217.45:8123',
+            hasLogs: false
+        },
+        {
+            id: 'adguard-home',
+            name: 'AdGuard Home',
+            sub: 'Protección DNS y filtrado de red',
+            icon: 'fa-solid fa-shield-halved',
+            iconColor: '#22c55e',
+            url: 'http://100.95.217.45:8084',
+            hasLogs: false
+        }
+    ];
+
+    const mainIds = new Set(mainServices.map(s => s.id));
+    const allDockerNames = Object.keys(dockerStatusMap);
+    const otherContainers = allDockerNames.filter(n => !mainIds.has(n));
+
+    let filteredMain = mainServices;
+    if (searchQuery) {
+        filteredMain = filteredMain.filter(s => 
+            s.name.toLowerCase().includes(searchQuery) || 
+            s.id.toLowerCase().includes(searchQuery) ||
+            s.sub.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    const rowsHtml = filteredMain.map(s => {
+        const state = dockerStatusMap[s.id] || 'stopped';
+        const isOnline = state === 'running';
+        const statusClass = isOnline ? 'status-online' : 'status-offline';
+
+        const webBtn = s.url ? `
+            <button class="btn-action" onclick="window.openUrl(event, '${s.url}')" title="Abrir interfaz web">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </button>
+        ` : '';
+
+        const logsBtn = s.hasLogs ? `
+            <button class="btn-action btn-text" onclick="window.showDockerLogs('${s.id}')" title="Ver logs en terminal">
+                <i class="fa-solid fa-terminal"></i> <span>Logs</span>
+            </button>
+        ` : '';
+
+        return `
+            <div class="row-item">
+                <!-- Columna 1: Identificador -->
+                <div class="row-identity" ${s.url ? `onclick="window.openUrl(event, '${s.url}')"` : ''} style="${s.url ? 'cursor: pointer;' : ''}">
+                    <div class="row-icon-box" style="border-color: ${s.iconColor}40">
+                        <i class="${s.icon}" style="color: ${s.iconColor}"></i>
+                    </div>
+                    <div class="row-name-block">
+                        <div class="row-title"><span>${s.name}</span></div>
+                        <span class="row-version">${s.sub}</span>
+                    </div>
+                </div>
+
+                <!-- Columna 2: Estado -->
+                <div class="row-status">
+                    <div class="status-badge ${statusClass}">
+                        <div class="status-dot ${isOnline ? 'pulse' : ''}"></div>
+                        <span>${isOnline ? 'running' : state}</span>
+                    </div>
+                </div>
+
+                <!-- Columna 3: Información -->
+                <div class="row-meta">
+                    <span class="branch-tag" title="Contenedor Docker">docker: ${s.id}</span>
+                </div>
+
+                <!-- Columna 4: Acciones -->
+                <div class="row-actions">
+                    <button class="btn-action" onclick="window.restartDockerContainer(event, '${s.id}')" title="Reiniciar contenedor en Docker">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    ${webBtn}
+                    ${logsBtn}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const otherGridHtml = otherContainers.map(name => {
+        const state = dockerStatusMap[name] || 'stopped';
+        const isOnline = state === 'running';
+        return `
+            <div class="docker-mini-pill ${isOnline ? 'running' : 'exited'}" title="${name}: ${state}">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden;">
+                    <div class="status-dot"></div>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
+                </div>
+                <button class="btn-action" style="width: 24px; height: 24px; font-size: 0.65rem;" onclick="window.showDockerLogs('${name}')" title="Ver logs">
+                    <i class="fa-solid fa-terminal"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    dockerSection.innerHTML = `
+        <div class="section-header" style="margin-top: 24px;">
+            <h2 class="section-title">
+                <i class="fa-brands fa-docker title-icon" style="color: #38bdf8;"></i> 
+                Docker & Paperless AI 
+                <span class="section-counter" id="section-count-docker">${allDockerNames.length}</span>
+            </h2>
+        </div>
+        <div class="docker-wrapper view-list">
+            ${rowsHtml}
+        </div>
+        ${otherContainers.length > 0 && !searchQuery ? `
+            <div class="docker-all-bar" onclick="window.toggleAllDocker()">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-layer-group" style="color: var(--accent);"></i>
+                    <span>Ver todos los contenedores Docker (${otherContainers.length} servicios adicionales)</span>
+                </div>
+                <i class="fa-solid ${isDockerOtherExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+            </div>
+            ${isDockerOtherExpanded ? `<div class="docker-pills-grid">${otherGridHtml}</div>` : ''}
+        ` : ''}
+    `;
+}
+
+window.toggleAllDocker = function() {
+    isDockerOtherExpanded = !isDockerOtherExpanded;
+    renderDockerSection();
+};
+
+window.restartDockerContainer = async function(event, containerName) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const btn = event ? event.currentTarget : null;
+    const icon = btn ? btn.querySelector('i') : null;
+    if (icon) icon.classList.add('fa-spin');
+    if (btn) btn.disabled = true;
+
+    showToast(`Reiniciando contenedor ${containerName}...`, 'info');
+
+    try {
+        const res = await fetch('/api/docker/restart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: containerName })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Contenedor ${containerName} reiniciado`, 'success');
+            setTimeout(fetchData, 1500);
+        } else {
+            showToast(`Error al reiniciar ${containerName}: ${data.error || 'Fallo desconocido'}`, 'error');
+        }
+    } catch(err) {
+        showToast(`Error al conectar con Docker para reiniciar ${containerName}`, 'error');
+    } finally {
+        if (icon) icon.classList.remove('fa-spin');
+        if (btn) btn.disabled = false;
+    }
+};
+
+window.showDockerLogs = function(containerName) {
+    window.showBotLogs(containerName, true);
+};
 
 function renderKPICards(pendingProjects, pendingBots) {
     let kpiContainer = document.getElementById('kpi-summary-container');
@@ -1190,17 +1478,19 @@ window.flushBotLogs = async function(name) {
     }
 };
 
-window.showBotLogs = async (name) => {
+window.showBotLogs = async (name, isDocker = false) => {
     activeBotLogName = name;
     logAutoScroll = true;
 
     // Configurar cabecera modal con toolbar
     const modalHeader = document.querySelector('#bot-modal .modal-header');
     if (modalHeader) {
+        const iconClass = isDocker ? 'fa-brands fa-docker' : 'fa-solid fa-terminal';
+        const subText = isDocker ? 'Logs de contenedor Docker' : 'Salida de PM2';
         modalHeader.innerHTML = `
             <div class="terminal-header-row">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div class="modal-icon-badge whatsapp-badge"><i class="fa-solid fa-terminal"></i></div>
+                    <div class="modal-icon-badge ${isDocker ? '' : 'whatsapp-badge'}" style="${isDocker ? 'background: rgba(56, 189, 248, 0.15); color: #38bdf8;' : ''}"><i class="${iconClass}"></i></div>
                     <div>
                         <h3 style="display: flex; align-items: center; gap: 8px;">
                             ${name}
@@ -1208,7 +1498,7 @@ window.showBotLogs = async (name) => {
                                 <span class="terminal-status-dot"></span> En vivo
                             </span>
                         </h3>
-                        <p class="modal-project-sub" style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;">Salida de PM2</p>
+                        <p class="modal-project-sub" style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;">${subText}</p>
                     </div>
                 </div>
                 <div class="terminal-actions-bar">
@@ -1218,9 +1508,11 @@ window.showBotLogs = async (name) => {
                     <button class="terminal-btn" onclick="window.copyBotLogs()" title="Copiar logs completos">
                         <i class="fa-solid fa-copy"></i> <span>Copiar</span>
                     </button>
+                    ${!isDocker ? `
                     <button class="terminal-btn terminal-btn-danger" onclick="window.flushBotLogs('${name}')" title="Vaciar logs en PM2">
                         <i class="fa-solid fa-trash-can"></i> <span>Vaciar</span>
                     </button>
+                    ` : ''}
                     <button class="terminal-btn" onclick="window.closeBotModal()" style="padding: 5px 8px;" title="Cerrar">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -1257,10 +1549,15 @@ window.showBotLogs = async (name) => {
 
     const fetchLogs = async () => {
         try {
-            const isWhatsApp = name.includes('whatsapp');
-            const url = (config.pcName === 'MSI' && isWhatsApp)
-                ? `http://${config.remoteServerIp}:4000/api/bots/logs/${name}` 
-                : `/api/bots/logs/${name}`;
+            let url = '';
+            if (isDocker) {
+                url = `/api/docker/logs?name=${encodeURIComponent(name)}&lines=150`;
+            } else {
+                const isWhatsApp = name.includes('whatsapp');
+                url = (config.pcName === 'MSI' && isWhatsApp)
+                    ? `http://${config.remoteServerIp}:4000/api/bots/logs/${name}` 
+                    : `/api/bots/logs/${name}`;
+            }
                 
             const res = await fetch(url);
             const data = await res.json();
