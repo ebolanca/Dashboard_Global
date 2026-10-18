@@ -24,7 +24,185 @@ const iconsMap = {
     'drop': 'fa-paperclip'
 };
 
+function formatUptime(uptime) {
+    if (!uptime) return '0m';
+    const ms = Date.now() - uptime;
+    if (ms <= 0) return '0m';
+    const mins = Math.floor(ms / 60000);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days}d ${hours % 24}h`;
+    if (hours > 0) return `${hours}h ${mins % 60}m`;
+    return `${mins}m`;
+}
+
+function formatTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '';
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
+
+        if (diffSec < 60) return 'ahora';
+        if (diffMin < 60) return `hace ${diffMin}m`;
+        if (diffHour < 24) return `hace ${diffHour}h`;
+        if (diffDay === 1) return 'ayer';
+        if (diffDay < 30) return `hace ${diffDay}d`;
+        const diffMonth = Math.floor(diffDay / 30);
+        return `hace ${diffMonth} mes${diffMonth > 1 ? 'es' : ''}`;
+    } catch (e) {
+        return '';
+    }
+}
+
+function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    const icon = type === 'success' ? 'fa-circle-check' :
+                 type === 'error' ? 'fa-circle-xmark' :
+                 type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-info';
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+window.restartBot = async function(event, botName) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const btn = event ? event.currentTarget : null;
+    const icon = btn ? btn.querySelector('i') : null;
+    if (icon) {
+        icon.classList.add('fa-spin');
+    }
+    if (btn) btn.disabled = true;
+
+    showToast(`Reiniciando ${botName}...`, 'info');
+
+    try {
+        const isWhatsApp = botName.includes('whatsapp');
+        const targetUrl = (config.pcName === 'MSI' && isWhatsApp)
+            ? `http://${config.remoteServerIp}:4000/api/pm2/restart`
+            : '/api/pm2/restart';
+
+        const res = await fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: botName })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Bot ${botName} reiniciado correctamente`, 'success');
+            setTimeout(fetchData, 1200);
+        } else {
+            showToast(`Error reiniciando ${botName}: ${data.error || 'Fallo desconocido'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Error al reiniciar bot:', err);
+        showToast(`Error de conexión al reiniciar ${botName}`, 'error');
+    } finally {
+        if (icon) icon.classList.remove('fa-spin');
+        if (btn) btn.disabled = false;
+    }
+};
+
 async function init() {
+    // Inyectar estilos para badges de commit, botones y toasts
+    const dynamicStyles = document.createElement('style');
+    dynamicStyles.textContent = `
+        .row-item {
+            grid-template-columns: 220px 170px 1fr auto !important;
+            gap: 16px !important;
+        }
+        .commit-hash {
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .commit-time {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .metric-pill.metric-pill-warning {
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.08);
+            color: #fbbf24;
+        }
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100000;
+            pointer-events: none;
+        }
+        .toast-item {
+            pointer-events: auto;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transition: all 0.3s ease;
+        }
+        .toast-item.hide {
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+        }
+        .toast-success { border-color: rgba(16, 185, 129, 0.4); }
+        .toast-success i { color: #10b981; }
+        .toast-error { border-color: rgba(239, 68, 68, 0.4); }
+        .toast-error i { color: #ef4444; }
+        .toast-warning { border-color: rgba(245, 158, 11, 0.4); }
+        .toast-warning i { color: #f59e0b; }
+        .toast-info { border-color: rgba(56, 189, 248, 0.4); }
+        .toast-info i { color: var(--accent); }
+        @keyframes toastSlideIn {
+            from { opacity: 0; transform: translateY(15px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    `;
+    document.head.appendChild(dynamicStyles);
+
     try {
         const res = await fetch('/api/config');
         config = await res.json();
@@ -302,6 +480,18 @@ function renderProjects(projects) {
         const icon = p.icon || iconsMap[p.name] || 'fa-folder';
         const hasChanges = p.localChanges > 0 || p.ahead > 0;
         
+        const vscodeBtn = (config.pcName === 'MSI' && p.localPath) ? `
+            <button class="btn-action" onclick="window.openUrl(event, 'vscode://file/${encodeURI(p.localPath.replace(/\\/g, '/'))}')" title="Abrir en VS Code">
+                <i class="fa-solid fa-code"></i>
+            </button>
+        ` : '';
+
+        const webBtn = (p.url && p.url !== '#') ? `
+            <button class="btn-action" onclick="window.openUrl(event, '${p.url}')" title="Abrir web / producción">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </button>
+        ` : '';
+
         const actionBtn = hasChanges ? `
             <button class="btn-action deploy-btn" onclick="openDeployModal(event, '${p.name}', '${p.version}')" title="Sincronizar y Subir cambios">
                 <i class="fa-solid fa-rocket"></i>
@@ -342,14 +532,18 @@ function renderProjects(projects) {
             <!-- Columna 3: Rama y Último Commit -->
             <div class="row-meta">
                 <span class="branch-tag" title="Rama">${p.branch || 'main'}</span>
+                ${p.commitHash ? `<span class="commit-hash" title="Commit ${p.commitHash}">${p.commitHash}</span>` : ''}
                 <div class="commit-text" title="${p.lastCommit || 'Sin commit'}">
                     <i class="fa-solid fa-code-commit"></i>
                     <span>${p.lastCommit || '-'}</span>
                 </div>
+                ${p.commitDate ? `<span class="commit-time" title="${new Date(p.commitDate).toLocaleString('es-ES')}">${formatTimeAgo(p.commitDate)}</span>` : ''}
             </div>
 
             <!-- Columna 4: Acciones -->
             <div class="row-actions">
+                ${vscodeBtn}
+                ${webBtn}
                 <button class="btn-action" onclick="window.openUrl(event, '${p.githubUrl}')" title="Ver en GitHub">
                     <i class="fa-brands fa-github"></i>
                 </button>
@@ -421,13 +615,22 @@ function renderBots(bots) {
                     </div>
                     <div class="metric-pill" title="Tiempo activo">
                         <i class="fa-solid fa-clock" style="color: #10b981;"></i>
-                        <strong>${Math.floor(b.uptime / 3600000)}</strong>h
+                        <strong>${formatUptime(b.uptime)}</strong>
                     </div>
+                    ${(b.restarts && b.restarts > 0) ? `
+                    <div class="metric-pill ${b.restarts > 5 ? 'metric-pill-warning' : ''}" title="${b.restarts} reinicios registrados">
+                        <i class="fa-solid fa-arrows-rotate" style="color: #f59e0b;"></i>
+                        <strong>${b.restarts}</strong> rev
+                    </div>
+                    ` : ''}
                 </div>
             </div>
 
             <!-- Columna 4: Acciones -->
             <div class="row-actions">
+                <button class="btn-action" onclick="window.restartBot(event, '${b.name}')" title="Reiniciar bot en PM2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
                 ${logsBtn}
             </div>
         `;

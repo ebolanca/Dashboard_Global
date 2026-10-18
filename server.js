@@ -304,7 +304,10 @@ app.get('/api/projects', async (req, res) => {
                     localChanges: localChangesCount,
                     isClean: isClean,
                     lastCommit: lastCommit,
+                    commitHash: log.latest ? log.latest.hash.substring(0, 7) : null,
+                    commitDate: log.latest ? log.latest.date : null,
                     version: version,
+                    localPath: projectPath,
                     githubUrl: `https://github.com/ebolanca/${f}`
                 };
 
