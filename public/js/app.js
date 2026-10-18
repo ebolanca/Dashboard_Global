@@ -388,6 +388,108 @@ async function init() {
         .kpi-card.kpi-card-warning.has-pending.active::before {
             background: #f59e0b !important;
         }
+
+        /* Terminal de Logs Avanzada */
+        .modal-logs {
+            max-width: 980px !important;
+            width: 94% !important;
+            background: #0b0f19 !important;
+            border: 1px solid rgba(56, 189, 248, 0.25) !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8) !important;
+        }
+        .terminal-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .terminal-actions-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .terminal-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            padding: 5px 11px;
+            border-radius: 6px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .terminal-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+        .terminal-btn.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .terminal-btn-danger:hover {
+            background: rgba(239, 68, 68, 0.15) !important;
+            border-color: #ef4444 !important;
+            color: #ef4444 !important;
+        }
+        .terminal-window {
+            background: #060911;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            height: 500px;
+            max-height: 65vh;
+            overflow-y: auto;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .terminal-line {
+            padding: 1px 4px;
+            border-radius: 3px;
+            display: block;
+        }
+        .terminal-line.log-error {
+            color: #f87171;
+            background: rgba(239, 68, 68, 0.08);
+            border-left: 2px solid #ef4444;
+        }
+        .terminal-line.log-warn {
+            color: #fbbf24;
+            background: rgba(245, 158, 11, 0.06);
+            border-left: 2px solid #f59e0b;
+        }
+        .terminal-line.log-success {
+            color: #34d399;
+        }
+        .terminal-line.log-meta {
+            color: #38bdf8;
+        }
+        .terminal-timestamp {
+            color: #64748b;
+            margin-right: 6px;
+        }
+        .terminal-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+            display: inline-block;
+            margin-right: 6px;
+            animation: pulseDot 2s infinite;
+        }
     `;
     document.head.appendChild(dynamicStyles);
 
@@ -993,41 +1095,203 @@ window.syncAllProjects = async function() {
     }
 };
 
+let logAutoScroll = true;
+let rawBotLogs = '';
+let activeBotLogName = '';
+
+function formatTerminalLine(line) {
+    if (!line) return '<span class="terminal-line">&nbsp;</span>';
+    
+    if (line.includes('▄') || line.includes('█') || line.includes('▀')) {
+        return `<span class="terminal-line" style="color: #fff; font-family: monospace; line-height: 1.1;">${line}</span>`;
+    }
+
+    const escaped = line
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    const lower = escaped.toLowerCase();
+    let typeClass = '';
+    
+    if (lower.includes('error') || lower.includes('exception') || lower.includes('failed') || lower.includes('fatal') || lower.includes('rejection')) {
+        typeClass = 'log-error';
+    } else if (lower.includes('warn') || lower.includes('aviso')) {
+        typeClass = 'log-warn';
+    } else if (lower.includes('online') || lower.includes('conectado') || lower.includes('success') || lower.includes('✓') || lower.includes('listo')) {
+        typeClass = 'log-success';
+    } else if (lower.includes('whatsapp') || lower.includes('mensaje') || lower.includes('otp') || lower.includes('media_')) {
+        typeClass = 'log-meta';
+    }
+
+    const formatted = escaped.replace(/^(\[?[0-9T:\-\.\s]{8,25}\]?)/, '<span class="terminal-timestamp">$1</span>');
+
+    return `<span class="terminal-line ${typeClass}">${formatted}</span>`;
+}
+
+window.toggleLogAutoScroll = function() {
+    logAutoScroll = !logAutoScroll;
+    const btn = document.getElementById('btn-terminal-scroll');
+    if (btn) {
+        btn.classList.toggle('active', logAutoScroll);
+        btn.innerHTML = `<i class="fa-solid fa-arrow-down"></i> <span>Auto-scroll: ${logAutoScroll ? 'ON' : 'OFF'}</span>`;
+    }
+    if (logAutoScroll) {
+        const win = document.getElementById('terminal-logs-window');
+        if (win) win.scrollTop = win.scrollHeight;
+    }
+};
+
+window.copyBotLogs = async function() {
+    if (!rawBotLogs) {
+        showToast('No hay logs para copiar', 'warning');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(rawBotLogs);
+        showToast('Logs copiados al portapapeles', 'success');
+    } catch (err) {
+        const textarea = document.createElement('textarea');
+        textarea.value = rawBotLogs;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('Logs copiados al portapapeles', 'success');
+    }
+};
+
+window.flushBotLogs = async function(name) {
+    if (!name) return;
+    if (!confirm(`¿Seguro que deseas vaciar los logs de PM2 de ${name}?`)) return;
+
+    try {
+        const isWhatsApp = name.includes('whatsapp');
+        const targetUrl = (config.pcName === 'MSI' && isWhatsApp)
+            ? `http://${config.remoteServerIp}:4000/api/bots/logs/flush`
+            : '/api/bots/logs/flush';
+
+        const res = await fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Logs de ${name} vaciados correctamente`, 'success');
+            const win = document.getElementById('terminal-logs-window');
+            if (win) win.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">Logs vaciados. Esperando nueva actividad...</div>';
+            rawBotLogs = '';
+        } else {
+            showToast(`Error al vaciar logs: ${data.error || 'Fallo desconocido'}`, 'error');
+        }
+    } catch (e) {
+        showToast('Error de conexión al vaciar logs', 'error');
+    }
+};
+
 window.showBotLogs = async (name) => {
-    document.getElementById('modal-bot-name').innerText = name;
-    document.getElementById('bot-logs-content').innerHTML = '<div class="spinner"></div>';
+    activeBotLogName = name;
+    logAutoScroll = true;
+
+    // Configurar cabecera modal con toolbar
+    const modalHeader = document.querySelector('#bot-modal .modal-header');
+    if (modalHeader) {
+        modalHeader.innerHTML = `
+            <div class="terminal-header-row">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="modal-icon-badge whatsapp-badge"><i class="fa-solid fa-terminal"></i></div>
+                    <div>
+                        <h3 style="display: flex; align-items: center; gap: 8px;">
+                            ${name}
+                            <span class="kpi-badge kpi-badge-success" style="font-size: 0.68rem; padding: 2px 7px;">
+                                <span class="terminal-status-dot"></span> En vivo
+                            </span>
+                        </h3>
+                        <p class="modal-project-sub" style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;">Salida de PM2</p>
+                    </div>
+                </div>
+                <div class="terminal-actions-bar">
+                    <button class="terminal-btn active" id="btn-terminal-scroll" onclick="window.toggleLogAutoScroll()" title="Pausar o reanudar auto-scroll">
+                        <i class="fa-solid fa-arrow-down"></i> <span>Auto-scroll: ON</span>
+                    </button>
+                    <button class="terminal-btn" onclick="window.copyBotLogs()" title="Copiar logs completos">
+                        <i class="fa-solid fa-copy"></i> <span>Copiar</span>
+                    </button>
+                    <button class="terminal-btn terminal-btn-danger" onclick="window.flushBotLogs('${name}')" title="Vaciar logs en PM2">
+                        <i class="fa-solid fa-trash-can"></i> <span>Vaciar</span>
+                    </button>
+                    <button class="terminal-btn" onclick="window.closeBotModal()" style="padding: 5px 8px;" title="Cerrar">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    const container = document.getElementById('bot-logs-content');
+    container.innerHTML = '<div class="terminal-window" id="terminal-logs-window"><div class="spinner"></div></div>';
     document.getElementById('bot-modal').style.display = 'flex';
+
+    const terminalWin = document.getElementById('terminal-logs-window');
+    if (terminalWin) {
+        terminalWin.addEventListener('scroll', () => {
+            const isNearBottom = terminalWin.scrollHeight - terminalWin.scrollTop - terminalWin.clientHeight < 45;
+            if (!isNearBottom && logAutoScroll) {
+                logAutoScroll = false;
+                const btn = document.getElementById('btn-terminal-scroll');
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.innerHTML = `<i class="fa-solid fa-arrow-down"></i> <span>Auto-scroll: OFF</span>`;
+                }
+            } else if (isNearBottom && !logAutoScroll) {
+                logAutoScroll = true;
+                const btn = document.getElementById('btn-terminal-scroll');
+                if (btn) {
+                    btn.classList.add('active');
+                    btn.innerHTML = `<i class="fa-solid fa-arrow-down"></i> <span>Auto-scroll: ON</span>`;
+                }
+            }
+        });
+    }
 
     const fetchLogs = async () => {
         try {
-            const url = config.pcName === 'MSI' 
+            const isWhatsApp = name.includes('whatsapp');
+            const url = (config.pcName === 'MSI' && isWhatsApp)
                 ? `http://${config.remoteServerIp}:4000/api/bots/logs/${name}` 
                 : `/api/bots/logs/${name}`;
                 
             const res = await fetch(url);
             const data = await res.json();
             
+            const win = document.getElementById('terminal-logs-window');
+            if (!win) return;
+
             if (data.logs && data.logs.length > 0) {
                 const logsText = data.logs.join('\n');
-                const container = document.getElementById('bot-logs-content');
-                const preElement = container.querySelector('.terminal-logs');
-                
-                if (!preElement || preElement.textContent !== logsText) {
-                    container.innerHTML = `<pre class="terminal-logs">${logsText}</pre>`;
-                    container.scrollTop = container.scrollHeight;
+                if (rawBotLogs !== logsText) {
+                    rawBotLogs = logsText;
+                    const formattedHtml = data.logs.map(line => formatTerminalLine(line)).join('');
+                    win.innerHTML = formattedHtml;
+                    
+                    if (logAutoScroll) {
+                        win.scrollTop = win.scrollHeight;
+                    }
                 }
             } else {
-                document.getElementById('bot-logs-content').innerHTML = '<div style="color: var(--text-muted)">No hay logs recientes.</div>';
+                win.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">No hay logs registrados para este proceso.</div>';
             }
         } catch (e) {
-            document.getElementById('bot-logs-content').innerText = "Error al conectar con OMEN.";
+            const win = document.getElementById('terminal-logs-window');
+            if (win) win.innerHTML = `<div style="color: #f87171; padding: 12px;">Error al conectar con el servidor de logs (${e.message}).</div>`;
         }
     };
 
     await fetchLogs();
 
     if (logInterval) clearInterval(logInterval);
-    logInterval = setInterval(fetchLogs, 5000);
+    logInterval = setInterval(fetchLogs, 3500);
 };
 
 function calculateNextVersion(current) {

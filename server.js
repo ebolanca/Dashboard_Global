@@ -906,6 +906,17 @@ app.get('/api/bots/logs/:name', (req, res) => {
     }
 });
 
+app.post('/api/bots/logs/flush', (req, res) => {
+    const botName = req.body.name;
+    if (!botName) return res.status(400).json({ error: 'Falta el nombre del bot' });
+    const { exec } = require('child_process');
+    console.log(`🧹 Vaciando logs de PM2 para '${botName}'...`);
+    exec(`pm2 flush ${botName}`, (err, stdout) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, stdout });
+    });
+});
+
 // --- API BANDEJA DE ENTRADA WHATSAPP META (INBOX) ---
 const WHATSAPP_INBOX_FILE = path.join(__dirname, 'data', 'whatsapp_inbox.json');
 
