@@ -1,5 +1,87 @@
 [
   {
+    "id": "wamid.HBgNNDkxNTIwMzQ3MzU4NBUCABEYEjI1QjkzMEYzNUMxNDEwRjIwMAA=",
+    "from": "34622609030",
+    "to": "4915203473584",
+    "recipientName": "Maximilian Mader (L'estudi - Marea)",
+    "direction": "outbound",
+    "type": "alert",
+    "category": "alerta_roja_dana",
+    "text": "🚨 *DRINGENDE WARNUNG - METEOROLOGISCHE ALARMSTUFE ROT IN GANDIA (DANA)*\nHallo Maximilian Mader,\nDie Katastrophenschutzbehörden (112 und AEMET) haben für Gandia die *Alarmstufe Rot* wegen Starkregens und Überschwemmungsgefahr ausgerufen.\n\n⚠️ *Wichtige Sicherheitshinweise:*\n• *BITTE BLEIBEN SIE DRINNEN:* Verlassen Sie das Apartment vorerst nicht.\n• Der gesamte öffentliche Nahverkehr (Züge der Linie Renfe C1 und Busse) ist *vollständig eingestellt*.\n• Straßen und Zufahrtswege sind teilweise überflutet und gesperrt.\n\nIm Notfall wählen Sie 112 oder schreiben Sie uns hier. Bleiben Sie in Sicherheit!",
+    "status": "failed",
+    "error": "Meta 24h Policy (131047): Message failed to send because more than 24 hours have passed since the customer last replied. Approved template required.",
+    "date": "2026-10-19T08:24:17.000Z",
+    "timestamp": 1792398257000
+  },
+  {
+    "id": "wamid.HBgMMzkzMjk3OTY3MzgxFQIAERgSNTZCRkJFRDgxNTJBNzc5NTQ0AA==",
+    "from": "34622609030",
+    "to": "393297967381",
+    "recipientName": "Huésped L'estudi (Italia)",
+    "direction": "outbound",
+    "type": "alert",
+    "category": "alerta_roja_dana",
+    "text": "🚨 *AVVISO URGENTE - ALLERTA ROSSA METEO A GANDIA (DANA)*\nCiao,\nLe autorità di emergenza (112 e AEMET) hanno attivato l'*Allerta Rossa* per piogge torrenziali e rischio inondazioni a Gandia e nella comarca.\n\n⚠️ *Istruzioni ufficiali di sicurezza:*\n• *NON uscire dall'alloggio:* rimani al riparo nell'appartamento.\n• Il trasporto pubblico (treni Renfe C1 e autobus urbani/interurbani) è completamente *sospeso*.\n• Strade e accessi principali presentano allagamenti e blocchi del traffico.\n\nPer qualsiasi emergenza chiama il 112 o contattaci qui. Resta al sicuro!",
+    "status": "failed",
+    "error": "Meta 24h Policy (131047): Message failed to send because more than 24 hours have passed since the customer last replied. Approved template required.",
+    "date": "2026-10-19T08:24:16.000Z",
+    "timestamp": 1792398256000
+  },
+  {
+    "id": "wamid.HBgMNDQ3OTI4Mzc3NjMwFQIAERgSOEIyNDcyQUNERENGOTdDQzREAA==",
+    "from": "34622609030",
+    "to": "447928377630",
+    "recipientName": "Sarka Tomsu (L'estudi - Arena)",
+    "direction": "outbound",
+    "type": "alert",
+    "category": "alerta_roja_dana",
+    "text": "🚨 *URGENT NOTICE - RED WEATHER ALERT IN GANDIA (DANA)*\nHello Sarka Tomsu,\nEmergency authorities (112 & AEMET) have declared a *Red Weather Alert* for torrential rain and flood risk in Gandia and the surrounding region.\n\n⚠️ *Official Safety Recommendations:*\n• *DO NOT leave the apartment:* please stay safely indoors.\n• All public transport (Renfe C1 commuter trains and local buses) is completely *suspended*.\n• Main roads and streets are experiencing flooding and traffic closures.\n\nIn case of emergency call 112 or message us here. Stay safe!",
+    "status": "failed",
+    "error": "Meta 24h Policy (131047): Message failed to send because more than 24 hours have passed since the customer last replied. Approved template required.",
+    "date": "2026-10-19T08:24:15.000Z",
+    "timestamp": 1792398255000
+  },
+  {
+    "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgASGCBBQ0NERkI4ODM5NkIzOTU1NjBFMDJERkI1OTFDNEI5MwA=",
+    "from": "34622609030",
+    "senderName": "Roberto",
+    "type": "text",
+    "text": "Que hay de pedido en mercadona",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-19T08:00:53.313Z",
+    "timestamp": 1792396853313,
+    "botResponse": {
+      "text": "Hola, *Roberto*. \n\nRespecto a tu consulta sobre **Mercadona**, aquí tienes la información de los pedidos tramitados y enviados recientemente:\n\n* **Último pedido (Hoy - 19/10/2026):**\n  Enviado por **Jazmín** (Estado: *enviado* - 10 artículos):\n  • Yogur griego (litro) (1 Unidad - 2.18€/u)\n  • Guacamole (5 Unidades - 4.35€/u)\n  • Arándanos congelados (2 Bolsas - 2.24€/u)\n  • Nachos (1 Caja - 0.90€/u)\n  • Rabanitos (1 Bolsa - 1.20€/u)\n  • Fresas congeladas (2 Bolsas - 1.98€/u)\n  • Yogur natural (6 ud) pequeño (1 Paquete)\n  • Plátanos (1 Kilo - 1.55€/u)\n\n* **Pedido anterior (18/10/2026):**\n  Enviado por **Aarón** (Estado: *enviado* - 4 artículos):\n  • Arándanos congelados (2 Bolsas - 2.24€/u)\n  • Fresas congeladas (2 Bolsas - 1.98€/u)\n  • Nata cocinar 500gr (1 Brick - 1.71€/u)\n  • Nachos (1 Caja - 0.90€/u)\n\n*(Nota: Si te referías a lo que hay anotado actualmente en el borrador pendiente de compra de Mercadona para el próximo envío, dímelo y te muestro la lista de la compra en curso).*",
+      "date": "2026-10-19T08:01:05.000Z",
+      "timestamp": 1792396865000
+    }
+  },
+  {
+    "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQTkyRjE5MDBCMjhDNzE2OENGMgA=",
+    "from": "34611356825",
+    "senderName": "Giuseppe Manna",
+    "type": "text",
+    "text": "Descafeinado reparado",
+    "mediaUrl": null,
+    "mediaType": null,
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-19T07:03:14.355Z",
+    "timestamp": 1792393394355,
+    "botResponse": {
+      "text": "Hola, *Giuseppe*. \n\nNo he entendido muy bien a qué te refieres con \"Descafeinado reparado\". \n\nSi necesitas consultar algo sobre turnos, fichajes, limpieza, pedidos o documentación, recuerda que puedes escribirme con total naturalidad o usar comandos como **ayuda** o **/help** para ver las opciones disponibles. \n\n¿En qué te puedo ayudar hoy?",
+      "date": "2026-10-19T07:03:53.000Z",
+      "timestamp": 1792393433000
+    }
+  },
+  {
     "id": "wamid.HBgLMzQ2NDI5ODA2NDQVAgASGBQzQUJCNERCMDAzRTY2N0U4NDBFRgA=",
     "from": "34642980644",
     "senderName": "Ami❤️",
@@ -12,7 +94,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-18T15:27:46.695Z",
-    "timestamp": 1792337266695
+    "timestamp": 1792337266695,
+    "botResponse": {
+      "text": "Hola, *Amina*. Entendido. Si no necesitas nada en este momento, aquí me tienes por si te surge cualquier duda o necesitas consultar tus turnos, fichajes, tareas o documentos. \n\nRecuerda que puedes escribirme cuando quieras o consultar el portal en cualquier momento: 👉 https://horarios-rail.web.app/\n\n¡Que pases un buen día!",
+      "date": "2026-10-18T15:28:10.000Z",
+      "timestamp": 1792337290000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2NDI4OTA4MDEVAgASGBQzQThFQjBGN0FGOTUxQjhEMUIxQQA=",
@@ -27,7 +114,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-18T13:47:32.143Z",
-    "timestamp": 1792331252143
+    "timestamp": 1792331252143,
+    "botResponse": {
+      "text": "🔧 *¡Aviso de Avería Registrado!*\n\nHola, *Maycol*. He registrado la avería de *Maquinaria general* en el panel técnico de Cafetería El Raíl y he avisado de inmediato a Antonio y a Giuseppe para que lo revisen.\n\n📸 _Foto adjuntada correctamente al parte de avería._\n\n¡Muchas gracias por avisar y ayudar a mantener el bar a punto! 👍\n\n💡 _Escribe *0* o *menu* si necesitas realizar otra consulta._",
+      "date": "2026-10-18T13:47:47.000Z",
+      "timestamp": 1792331267000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2NDI5ODA2NDQVAgASGBQzQUEzRDMwNTdBMUFERUNFQzI5NgA=",
@@ -42,7 +134,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-16T15:00:00.398Z",
-    "timestamp": 1792162800398
+    "timestamp": 1792162800398,
+    "botResponse": {
+      "text": "Hola, *Amina*. Entendido. Si no necesitas nada en este momento, aquí me tienes por si te surge cualquier duda o necesitas consultar tus turnos, fichajes, tareas o documentos. \n\nRecuerda que puedes escribirme cuando quieras o consultar el portal en cualquier momento: 👉 https://horarios-rail.web.app/\n\n¡Que pases un buen día!",
+      "date": "2026-10-18T15:28:10.000Z",
+      "timestamp": 1792337290000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQUVDRTcyRjRGN0E0M0U1QTZFMAA=",
@@ -57,7 +154,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-16T09:46:08.392Z",
-    "timestamp": 1792143968392
+    "timestamp": 1792143968392,
+    "botResponse": {
+      "text": "Hola, *Giuseppe*. \n\nNo he entendido muy bien a qué te refieres con \"Descafeinado reparado\". \n\nSi necesitas consultar algo sobre turnos, fichajes, limpieza, pedidos o documentación, recuerda que puedes escribirme con total naturalidad o usar comandos como **ayuda** o **/help** para ver las opciones disponibles. \n\n¿En qué te puedo ayudar hoy?",
+      "date": "2026-10-19T07:03:53.000Z",
+      "timestamp": 1792393433000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2MTQ5ODY5NDgVAgASGCBBQzI4MzBERUE1RjAwNzYzMzQ0OTM3RTk5MTg2NjhGMAA=",
@@ -87,7 +189,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-15T18:04:00.609Z",
-    "timestamp": 1792087440609
+    "timestamp": 1792087440609,
+    "botResponse": {
+      "text": "Hola, *Giuseppe*. \n\nNo he entendido muy bien a qué te refieres con \"Descafeinado reparado\". \n\nSi necesitas consultar algo sobre turnos, fichajes, limpieza, pedidos o documentación, recuerda que puedes escribirme con total naturalidad o usar comandos como **ayuda** o **/help** para ver las opciones disponibles. \n\n¿En qué te puedo ayudar hoy?",
+      "date": "2026-10-19T07:03:53.000Z",
+      "timestamp": 1792393433000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2MTEzNTY4MjUVAgASGBQzQTczRUZGOEQ1ODAyMUM0MzlCOQA=",
@@ -102,7 +209,12 @@
     "buttonId": null,
     "rawErrors": null,
     "date": "2026-10-15T18:03:17.940Z",
-    "timestamp": 1792087397940
+    "timestamp": 1792087397940,
+    "botResponse": {
+      "text": "Hola, *Giuseppe*. \n\nNo he entendido muy bien a qué te refieres con \"Descafeinado reparado\". \n\nSi necesitas consultar algo sobre turnos, fichajes, limpieza, pedidos o documentación, recuerda que puedes escribirme con total naturalidad o usar comandos como **ayuda** o **/help** para ver las opciones disponibles. \n\n¿En qué te puedo ayudar hoy?",
+      "date": "2026-10-19T07:03:53.000Z",
+      "timestamp": 1792393433000
+    }
   },
   {
     "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgASGCBBQ0I2MkM1ODNDQUQ1RkJGRDBBQUE5Q0ZEQjg2RDk2MAA=",
@@ -420,21 +532,6 @@
     "timestamp": 1791904523833
   },
   {
-    "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgASGCBBQzE3MkEzOEQ2Qjg0NUE5RDI2RTFBNUI2REQ1QkUwRQA=",
-    "from": "34622609030",
-    "senderName": "Roberto",
-    "type": "audio",
-    "text": "[Audio recibido]",
-    "mediaUrl": "/media/whatsapp/media_1791895671876_1828785941457212.ogg",
-    "mediaType": "audio/ogg",
-    "isOtp": false,
-    "otpCode": null,
-    "buttonId": null,
-    "rawErrors": null,
-    "date": "2026-10-13T12:47:51.877Z",
-    "timestamp": 1791895671877
-  },
-  {
     "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgARGBJBQUFCMjk0OEFFRDE3QUFGQ0UA",
     "from": "34910871265",
     "senderName": "Amazon España",
@@ -454,5 +551,20 @@
     ],
     "date": "2026-10-13T13:45:00.000Z",
     "timestamp": 1791899100000
+  },
+  {
+    "id": "wamid.HBgLMzQ2MjI2MDkwMzAVAgASGCBBQzE3MkEzOEQ2Qjg0NUE5RDI2RTFBNUI2REQ1QkUwRQA=",
+    "from": "34622609030",
+    "senderName": "Roberto",
+    "type": "audio",
+    "text": "[Audio recibido]",
+    "mediaUrl": "/media/whatsapp/media_1791895671876_1828785941457212.ogg",
+    "mediaType": "audio/ogg",
+    "isOtp": false,
+    "otpCode": null,
+    "buttonId": null,
+    "rawErrors": null,
+    "date": "2026-10-13T12:47:51.877Z",
+    "timestamp": 1791895671877
   }
 ]

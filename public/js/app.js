@@ -1451,13 +1451,16 @@ window.fetchWhatsAppInbox = async function(showSpinner = false) {
 
         const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        whatsappInboxMessages = await res.json();
+        const newMessages = await res.json();
+        const hasChanged = JSON.stringify(whatsappInboxMessages) !== JSON.stringify(newMessages);
+        whatsappInboxMessages = newMessages;
 
         // Actualizar contadores
         const total = whatsappInboxMessages.length;
         const otpCount = whatsappInboxMessages.filter(m => m.isOtp).length;
         const mediaCount = whatsappInboxMessages.filter(m => m.mediaUrl || m.type === 'image' || m.type === 'document').length;
-        const guestCount = whatsappInboxMessages.filter(m => !m.isOtp && m.from !== '34910871265').length;
+        const guestCount = whatsappInboxMessages.filter(m => !m.isOtp && m.from !== '34910871265' && m.type !== 'alert' && m.category !== 'alerta_roja_dana').length;
+        const alertCount = whatsappInboxMessages.filter(m => m.type === 'alert' || m.category === 'alerta_roja_dana' || m.isAlert).length;
 
         const countBadge = document.getElementById('whatsapp-inbox-count');
         if (countBadge) {
@@ -1473,8 +1476,12 @@ window.fetchWhatsAppInbox = async function(showSpinner = false) {
         if (elMedia) elMedia.innerText = mediaCount;
         const elGuest = document.getElementById('inbox-count-guest');
         if (elGuest) elGuest.innerText = guestCount;
+        const elAlerts = document.getElementById('inbox-count-alerts');
+        if (elAlerts) elAlerts.innerText = alertCount;
 
-        window.renderWhatsAppInbox();
+        if (hasChanged || showSpinner) {
+            window.renderWhatsAppInbox();
+        }
     } catch (e) {
         console.error('Error fetching whatsapp inbox:', e);
         if (container && showSpinner) {
@@ -1483,6 +1490,49 @@ window.fetchWhatsAppInbox = async function(showSpinner = false) {
     }
 };
 
+
+const expandedBotReplies = new Set();
+
+function formatWhatsAppText(str) {
+    if (!str) return '';
+    let res = str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    // Negrita markdown **texto**
+    res = res.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+    // Negrita WhatsApp *texto*
+    res = res.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<strong>$2</strong>$3');
+    // Cursiva _texto_
+    res = res.replace(/(^|[^_])_([^\_\n]+)_([^_]|$)/g, '$1<em>$2</em>$3');
+    // Tachado ~texto~
+    res = res.replace(/~([^~\n]+)~/g, '<del>$1</del>');
+    // Bloques de código
+    res = res.replace(/```([^`]+)```/g, '<pre style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; overflow-x: auto;"><code>$1</code></pre>');
+    // Código inline
+    res = res.replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px;">$1</code>');
+    // Saltos de línea
+    res = res.replace(/\n/g, '<br>');
+    return res;
+}
+
+window.toggleBotReply = function(id, btn) {
+    if (expandedBotReplies.has(id)) {
+        expandedBotReplies.delete(id);
+    } else {
+        expandedBotReplies.add(id);
+    }
+    const content = document.getElementById('bot-reply-' + id);
+    const icon = btn ? btn.querySelector('.inbox-bot-toggle-icon') : null;
+    const isExpanded = expandedBotReplies.has(id);
+    if (content) {
+        content.style.display = isExpanded ? 'block' : 'none';
+    }
+    if (icon) {
+        icon.classList.toggle('fa-chevron-up', isExpanded);
+        icon.classList.toggle('fa-chevron-down', !isExpanded);
+    }
+};
 window.renderWhatsAppInbox = function() {
     const container = document.getElementById('whatsapp-inbox-content');
     if (!container) return;
@@ -1524,6 +1574,9 @@ window.renderWhatsAppInbox = function() {
 
     container.innerHTML = list.map(m => {
         const isAmazon = m.from === '34910871265' || (m.senderName && m.senderName.includes('Amazon'));
+        const isAlert = m.type === 'alert' || m.category === 'alerta_roja_dana' || m.isAlert;
+        const isOutbound = m.direction === 'outbound' || isAlert;
+
         const dateObj = new Date(m.timestamp || m.date);
         const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = dateObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
@@ -1538,7 +1591,9 @@ window.renderWhatsAppInbox = function() {
 
         // Tag según tipo
         let typeBadge = '';
-        if (isAmazon || m.isOtp) {
+        if (isAlert) {
+            typeBadge = `<span class="inbox-type-tag tag-alert"><i class="fa-solid fa-triangle-exclamation"></i> ALERTA DANA</span>`;
+        } else if (isAmazon || m.isOtp) {
             typeBadge = `<span class="inbox-type-tag ${isAmazon ? 'tag-amazon' : 'tag-otp'}"><i class="fa-solid fa-key"></i> OTP / SEGURIDAD</span>`;
         } else if (m.mediaUrl || m.type === 'image') {
             typeBadge = `<span class="inbox-type-tag tag-image"><i class="fa-solid fa-image"></i> IMAGEN</span>`;
@@ -1546,8 +1601,23 @@ window.renderWhatsAppInbox = function() {
             typeBadge = `<span class="inbox-type-tag tag-text"><i class="fa-solid fa-message"></i> TEXTO</span>`;
         }
 
+        // Estado si es outbound
+        let statusBadge = '';
+        if (isOutbound && m.status) {
+            const statusClass = m.status === 'failed' ? 'status-failed' : (m.status === 'delivered' ? 'status-delivered' : 'status-sent');
+            const statusLabel = m.status === 'failed' ? 'FALLIDO' : (m.status === 'delivered' ? 'ENTREGADO' : 'ENVIADO');
+            statusBadge = `<span class="inbox-badge-status ${statusClass}">${statusLabel}</span>`;
+        }
+
         // Avatar
-        let avatarHtml = `<div class="inbox-avatar ${isAmazon ? 'avatar-amazon' : ''}"><i class="${isAmazon ? 'fa-brands fa-amazon' : 'fa-solid fa-user'}"></i></div>`;
+        let avatarHtml = '';
+        if (isAlert) {
+            avatarHtml = `<div class="inbox-avatar" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>`;
+        } else if (isAmazon) {
+            avatarHtml = `<div class="inbox-avatar avatar-amazon"><i class="fa-brands fa-amazon"></i></div>`;
+        } else {
+            avatarHtml = `<div class="inbox-avatar"><i class="fa-solid fa-user"></i></div>`;
+        }
 
         // Renderizado especial si es OTP
         let otpBox = '';
@@ -1605,11 +1675,72 @@ window.renderWhatsAppInbox = function() {
             `;
         }
 
-        const senderDisplay = m.senderName ? `${m.senderName}` : `+${m.from}`;
-        const phoneSub = m.senderName ? `<span class="inbox-sender-phone">+${m.from}</span>` : '';
+        // Aviso si falló por política de 24h de Meta
+        let alertMetaReason = '';
+        if (isAlert && m.status === 'failed') {
+            alertMetaReason = `
+                <div class="inbox-alert-meta-reason">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 1.1rem; margin-top: 2px; color: #ef4444;"></i>
+                    <div>
+                        <strong>Motivo del fallo en Meta Cloud API (Ventana de 24h):</strong><br>
+                        Meta no permite entregar mensajes de texto libre fuera de la ventana de 24 horas del cliente.<br>
+                        Para que se entregue automáticamente a huéspedes inactivos, debe enviarse como una <strong>Plantilla Oficial aprobada por Meta</strong> (ej. <code>alerta_meteorologica</code>).
+                    </div>
+                </div>
+            `;
+        }
+
+        // Acordeón de Respuesta del Bot (Minimizada por defecto)
+        let botReplyHtml = '';
+        if (m.botResponse && m.botResponse.text) {
+            const botDateObj = m.botResponse.date ? new Date(m.botResponse.date) : dateObj;
+            const botTimeStr = botDateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const previewText = m.botResponse.text.replace(/\n/g, ' ').slice(0, 65) + (m.botResponse.text.length > 65 ? '...' : '');
+            const formattedBotText = formatWhatsAppText(m.botResponse.text);
+
+            const isExpanded = expandedBotReplies.has(m.id);
+            botReplyHtml = `
+                <div class="inbox-bot-reply-box">
+                    <button class="inbox-bot-reply-toggle" onclick="window.toggleBotReply('${m.id}', this)" title="Haz clic para ver o plegar la respuesta completa del bot">
+                        <div class="inbox-bot-reply-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>Respuesta del bot:</span>
+                            <span class="inbox-bot-reply-preview">${previewText}</span>
+                        </div>
+                        <i class="fa-solid ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} inbox-bot-toggle-icon"></i>
+                    </button>
+                    <div class="inbox-bot-reply-content" id="bot-reply-${m.id}" style="display: ${isExpanded ? 'block' : 'none'};">
+                        <div class="inbox-bot-reply-text">${formattedBotText}</div>
+                        <div class="inbox-bot-reply-footer">
+                            <i class="fa-solid fa-check-double" style="color: #38bdf8;"></i>
+                            <span>Respondido a las ${botTimeStr}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Remitente / Destinatario Display
+        let senderDisplay = '';
+        let phoneSub = '';
+        if (isOutbound) {
+            senderDisplay = `📤 Para: ${m.recipientName || ('+' + m.to)}`;
+            phoneSub = m.to ? `<span class="inbox-sender-phone">(+${m.to})</span>` : '';
+        } else {
+            senderDisplay = m.senderName ? `${m.senderName}` : `+${m.from}`;
+            phoneSub = m.senderName ? `<span class="inbox-sender-phone">+${m.from}</span>` : '';
+        }
+
+        const cardClasses = [
+            'inbox-card',
+            isAlert ? 'card-alert' : '',
+            isAmazon ? 'card-amazon' : '',
+            m.isOtp ? 'card-otp' : '',
+            m.mediaUrl ? 'card-media' : ''
+        ].filter(Boolean).join(' ');
 
         return `
-            <div class="inbox-card ${isAmazon ? 'card-amazon' : (m.isOtp ? 'card-otp' : (m.mediaUrl ? 'card-media' : ''))}">
+            <div class="${cardClasses}">
                 <div class="inbox-card-header">
                     <div class="inbox-sender-info">
                         ${avatarHtml}
@@ -1619,16 +1750,19 @@ window.renderWhatsAppInbox = function() {
                         </div>
                     </div>
                     <div class="inbox-meta-right">
+                        ${statusBadge}
                         ${typeBadge}
                         <span class="inbox-time">${timeAgo}</span>
                     </div>
                 </div>
 
                 <div class="inbox-card-body">
-                    ${m.text ? `<div style="white-space: pre-wrap;">${m.text}</div>` : ''}
+                    ${m.text ? `<div>${formatWhatsAppText(m.text)}</div>` : ''}
                     ${otpBox}
                     ${mediaHtml}
                     ${amazonAlert}
+                    ${alertMetaReason}
+                    ${botReplyHtml}
                 </div>
             </div>
         `;
