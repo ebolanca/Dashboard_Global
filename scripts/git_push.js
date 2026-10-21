@@ -1,6 +1,8 @@
 const { execSync } = require('child_process');
 
-const commitMsg = process.argv[2] || 'Update Dashboard';
+const args = process.argv.slice(2);
+const noRestart = args.includes('--no-restart');
+const commitMsg = args.find(a => !a.startsWith('--')) || 'Update Dashboard';
 
 try {
     execSync('git config --global --add safe.directory "*"');
@@ -16,6 +18,8 @@ try {
     console.log('Push omitido o ya actualizado:', e.message);
 }
 
-try {
-    execSync('pm2 restart dashboard-global');
-} catch (e) {}
+if (!noRestart) {
+    try {
+        execSync('pm2 restart dashboard-global');
+    } catch (e) {}
+}

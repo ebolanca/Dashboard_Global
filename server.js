@@ -830,8 +830,19 @@ app.post('/api/projects/deploy', async (req, res) => {
         const finalSummary = (summary || '').trim() || 'Actualización de versión';
         const cleanVersion = version.replace(/^v/, '').trim();
         const commitMsg = `v${cleanVersion}: ${finalSummary}`; 
+
+        // Asegurar safe.directory para evitar errores de permisos/ownership en Git
+        try {
+            execSync('git config --global --add safe.directory "*"', execOpts);
+        } catch (e) {}
+
+        const isDashboardGlobal = folderName.toLowerCase() === 'dashboard_global';
+
         if (fs.existsSync(path.join(targetPath, 'scripts/git_push.js'))) {
-            execSync(`node scripts/git_push.js "${commitMsg}"`, execOpts);
+            const pushCmd = isDashboardGlobal 
+                ? `node scripts/git_push.js "${commitMsg.replace(/"/g, '\\"')}" --no-restart`
+                : `node scripts/git_push.js "${commitMsg.replace(/"/g, '\\"')}"`;
+            execSync(pushCmd, execOpts);
         } else {
             // Backup por si no hay script: commit directo
             execSync('git add .', execOpts);
@@ -844,6 +855,18 @@ app.post('/api/projects/deploy', async (req, res) => {
         }
 
         res.json({ success: true });
+
+        // Si se actualizó el propio Dashboard_Global, reiniciar PM2 de forma diferida (1.5s)
+        // para asegurar que la respuesta HTTP 200 llegue intacta al navegador antes del reinicio
+        if (isDashboardGlobal) {
+            console.log('🔄 Programando reinicio de dashboard-global en PM2 tras completar respuesta HTTP...');
+            setTimeout(() => {
+                const { exec } = require('child_process');
+                exec('pm2 restart dashboard-global', (err) => {
+                    if (err) console.error('Error reiniciando PM2 tras deploy:', err.message);
+                });
+            }, 1500);
+        }
     } catch (e) {
         console.error('Error in process:', e);
         res.status(500).json({ error: 'Process failed', details: e.message });
