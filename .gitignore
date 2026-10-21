@@ -10,3 +10,7 @@ dump.pm2
 config.json
 
 *.bat
+
+# Datos y multimedia dinámica de WhatsApp
+data/
+public/media/whatsapp/
