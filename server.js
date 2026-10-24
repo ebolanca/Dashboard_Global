@@ -217,6 +217,42 @@ app.get('/api/diag/docker-space', (req, res) => {
     });
 });
 
+app.post('/api/maintenance/clean-c', async (req, res) => {
+    const { exec } = require('child_process');
+    const logs = [];
+
+    const runCmd = (cmd) => new Promise(resolve => {
+        exec(cmd, { windowsHide: true, timeout: 60000 }, (err, stdout, stderr) => {
+            logs.push({ cmd, out: (stdout || stderr || '').trim(), err: err ? err.message : null });
+            resolve();
+        });
+    });
+
+    try {
+        // 1. Recrear Jellyfin con nuevos volúmenes (/transcode y /cache en D:)
+        if (!IS_MSI) {
+            await runCmd('docker compose -f "d:\\Docker\\media-server\\docker-compose.yml" up -d jellyfin');
+        }
+
+        // 2. Limpieza de caché de Docker en OMEN
+        if (!IS_MSI) {
+            await runCmd('docker builder prune -a -f');
+            await runCmd('docker system prune -f');
+        }
+
+        // 3. Limpieza de archivos temporales en C:
+        await runCmd('powershell -NoProfile -Command "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue"');
+        await runCmd('powershell -NoProfile -Command "Remove-Item -Path \'C:\\Windows\\Temp\\*\' -Recurse -Force -ErrorAction SilentlyContinue"');
+
+        // Actualizar métricas de disco de inmediato
+        updateDisksMetrics();
+
+        res.json({ success: true, logs });
+    } catch (e) {
+        res.status(500).json({ error: e.message, logs });
+    }
+});
+
 app.post('/api/display/mode', (req, res) => {
     const mode = req.body.mode || 'internal';
     const { exec } = require('child_process');
