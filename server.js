@@ -205,6 +205,24 @@ app.get('/api/hardware/disks', (req, res) => {
     res.json(cachedDisksData);
 });
 
+app.get('/api/diag/docker-space', (req, res) => {
+    const { exec } = require('child_process');
+    const cmd = `powershell -NoProfile -Command "
+        $vhdx = Get-ChildItem -Path 'C:\\Users' -Filter '*.vhdx' -Recurse -Depth 5 -ErrorAction SilentlyContinue | Select-Object FullName, @{Name='GB';Expression={[math]::Round($_.Length/1GB,2)}};
+        $dockerDf = docker system df 2>&1;
+        $jellyfinInspect = docker inspect jellyfin 2>&1 | ConvertFrom-Json;
+        $jellyfinMounts = $jellyfinInspect.Mounts | Select-Object Type, Source, Destination;
+        @{ vhdx = $vhdx; dockerDf = $dockerDf; jellyfinMounts = $jellyfinMounts } | ConvertTo-Json -Depth 4
+    "`;
+    exec(cmd, { timeout: 25000, maxBuffer: 10*1024*1024 }, (err, stdout, stderr) => {
+        try {
+            res.json(JSON.parse(stdout));
+        } catch(e) {
+            res.json({ err: err ? err.message : null, stdout, stderr });
+        }
+    });
+});
+
 app.post('/api/display/mode', (req, res) => {
     const mode = req.body.mode || 'internal';
     const { exec } = require('child_process');
