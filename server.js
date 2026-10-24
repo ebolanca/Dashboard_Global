@@ -1101,6 +1101,165 @@ app.post('/api/cmd', (req, res) => {
         res.json({ err: err ? err.message : null, stdout, stderr });
     });
 });
+
+// =========================================================================
+// ENDPOINT: AUTO-RECUPERACIÓN Y SINCRONIZACIÓN DE BROADLINK RM EN HOME ASSISTANT
+// =========================================================================
+const dgram = require('dgram');
+
+function discoverBroadlinkDevices(timeout = 2500) {
+    return new Promise((resolve) => {
+        const socket = dgram.createSocket('udp4');
+        const devices = [];
+
+        socket.bind(0, () => {
+            socket.setBroadcast(true);
+            const packet = Buffer.alloc(0x30, 0);
+            const now = new Date();
+            const timezone = now.getTimezoneOffset() / -60;
+            packet.writeInt32LE(timezone, 0x08);
+            packet.writeUInt16LE(now.getFullYear(), 0x0c);
+            packet.writeUInt8(now.getSeconds(), 0x0e);
+            packet.writeUInt8(now.getMinutes(), 0x0f);
+            packet.writeUInt8(now.getHours(), 0x10);
+            packet.writeUInt8(now.getDay(), 0x11);
+            packet.writeUInt8(now.getDate(), 0x12);
+            packet.writeUInt8(now.getMonth() + 1, 0x13);
+            packet.writeUInt16LE(0x0006, 0x26);
+
+            let checksum = 0xbeaf;
+            for (let i = 0; i < packet.length; i++) {
+                checksum = (checksum + packet[i]) & 0xffff;
+            }
+            packet.writeUInt16LE(checksum, 0x20);
+
+            socket.send(packet, 0, packet.length, 80, '255.255.255.255');
+        });
+
+        socket.on('message', (msg, rinfo) => {
+            if (msg.length >= 0x40) {
+                const mac = [
+                    msg[0x3f].toString(16).padStart(2, '0'),
+                    msg[0x3e].toString(16).padStart(2, '0'),
+                    msg[0x3d].toString(16).padStart(2, '0'),
+                    msg[0x3c].toString(16).padStart(2, '0'),
+                    msg[0x3b].toString(16).padStart(2, '0'),
+                    msg[0x3a].toString(16).padStart(2, '0')
+                ].join('');
+                const devType = msg.readUInt16LE(0x34);
+                devices.push({ host: rinfo.address, mac, devType });
+            }
+        });
+
+        setTimeout(() => {
+            try { socket.close(); } catch (e) {}
+            resolve(devices);
+        }, timeout);
+    });
+}
+
+app.all('/api/broadlink/sync', async (req, res) => {
+    try {
+        const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWY4MjZlYzQ1ZDU0YzYyOGFmMmEzYjY3MGM2ZjEzYSIsImlhdCI6MTc4NzgzNzUzNCwiZXhwIjoyMTAzMTk3NTM0fQ.ezj0ggwJqpqIOR05MFkMEg9SbjDM4XMcTpmHLDpxLFA';
+        const HA_URL = 'http://100.95.217.45:8123';
+        const HA_CONFIG_PATH = IS_MSI 
+            ? '\\\\100.95.217.45\\omen D\\Docker\\media-server\\config\\homeassistant'
+            : 'd:/Docker/media-server/config/homeassistant';
+
+        const devices = await discoverBroadlinkDevices(2500);
+        const macMap = {};
+        for (const d of devices) {
+            macMap[d.mac.toLowerCase()] = d.host;
+        }
+
+        const configEntriesPath = path.join(HA_CONFIG_PATH, '.storage', 'core.config_entries');
+        let updatedEntries = [];
+
+        if (fs.existsSync(configEntriesPath)) {
+            const raw = fs.readFileSync(configEntriesPath, 'utf8');
+            const data = JSON.parse(raw);
+            let changed = false;
+
+            for (const entry of data.data.entries) {
+                if (entry.domain === 'broadlink' && entry.data && entry.data.mac) {
+                    const mac = entry.data.mac.toLowerCase();
+                    if (macMap[mac] && entry.data.host !== macMap[mac]) {
+                        console.log(`[BroadlinkSync] IP cambiada para ${entry.title}: ${entry.data.host} -> ${macMap[mac]}`);
+                        entry.data.host = macMap[mac];
+                        changed = true;
+                        updatedEntries.push({ entry_id: entry.entry_id, title: entry.title, new_ip: macMap[mac] });
+                    }
+                }
+            }
+
+            if (changed) {
+                fs.writeFileSync(configEntriesPath, JSON.stringify(data, null, 2), 'utf8');
+                for (const item of updatedEntries) {
+                    try {
+                        await fetch(`${HA_URL}/api/services/homeassistant/reload_config_entry`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${HA_TOKEN}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ entry_id: item.entry_id })
+                        });
+                    } catch (e) {
+                        console.error(`[BroadlinkSync] Error recargando ${item.title}:`, e.message);
+                    }
+                }
+            }
+        }
+
+        const helperMap = {
+            'a043b05e9be5': 'input_text.ip_rm_salon',
+            '34ea3443d599': 'input_text.ip_rm_papa',
+            '24dfa74fc7b1': 'input_text.ip_rm_naomi'
+        };
+
+        for (const [mac, entityId] of Object.entries(helperMap)) {
+            if (macMap[mac]) {
+                try {
+                    await fetch(`${HA_URL}/api/services/input_text/set_value`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${HA_TOKEN}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            entity_id: entityId,
+                            value: macMap[mac]
+                        })
+                    });
+                } catch (e) {}
+            }
+        }
+
+        try {
+            await fetch(`${HA_URL}/api/services/persistent_notification/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${HA_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    title: 'Mandos RM Sincronizados',
+                    message: `Mandos detectados en red local:\n- Salón: ${macMap['a043b05e9be5'] || 'No detectado'}\n- Papa: ${macMap['34ea3443d599'] || 'No detectado'}\n- Naomi: ${macMap['24dfa74fc7b1'] || 'No detectado'}` + (updatedEntries.length > 0 ? `\n\n🔄 Se han actualizado las IPs desincronizadas en Home Assistant.` : `\n\n✅ Todas las IPs están sincronizadas y operativas.`),
+                    notification_id: 'broadlink_sync'
+                })
+            });
+        } catch (e) {}
+
+        res.json({
+            success: true,
+            discovered: devices,
+            updatedEntries
+        });
+    } catch (err) {
+        console.error('[BroadlinkSync] Error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 const PORT = 4000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Dashboard [${PC_NAME}] running on http://localhost:${PORT}`);
