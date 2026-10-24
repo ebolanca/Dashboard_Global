@@ -1172,42 +1172,61 @@ app.all('/api/broadlink/sync', async (req, res) => {
             macMap[d.mac.toLowerCase()] = d.host;
         }
 
-        const configEntriesPath = path.join(HA_CONFIG_PATH, '.storage', 'core.config_entries');
         let updatedEntries = [];
+        try {
+            const pyScript = `
+import json
+p = '/config/.storage/core.config_entries'
+with open(p, 'r', encoding='utf-8') as f:
+    d = json.load(f)
 
-        if (fs.existsSync(configEntriesPath)) {
-            const raw = fs.readFileSync(configEntriesPath, 'utf8');
-            const data = JSON.parse(raw);
-            let changed = false;
+mac_map = ${JSON.stringify(macMap)}
+updated = []
 
-            for (const entry of data.data.entries) {
-                if (entry.domain === 'broadlink' && entry.data && entry.data.mac) {
-                    const mac = entry.data.mac.toLowerCase();
-                    if (macMap[mac] && entry.data.host !== macMap[mac]) {
-                        console.log(`[BroadlinkSync] IP cambiada para ${entry.title}: ${entry.data.host} -> ${macMap[mac]}`);
-                        entry.data.host = macMap[mac];
-                        changed = true;
-                        updatedEntries.push({ entry_id: entry.entry_id, title: entry.title, new_ip: macMap[mac] });
-                    }
-                }
+for e in d['data']['entries']:
+    if e.get('domain') == 'broadlink' and e.get('data', {}).get('mac'):
+        m = e['data']['mac'].lower()
+        if m in mac_map and e['data']['host'] != mac_map[m]:
+            old_h = e['data']['host']
+            e['data']['host'] = mac_map[m]
+            updated.append({'id': e['entry_id'], 'title': e['title'], 'old': old_h, 'new': mac_map[m]})
+
+if updated:
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(d, f, indent=2, ensure_ascii=False)
+
+print(json.dumps(updated))
+`;
+            const b64 = Buffer.from(pyScript).toString('base64');
+            const dockerCmd = `docker exec homeassistant python3 -c "import base64; exec(base64.b64decode('${b64}').decode('utf-8'))"`;
+
+            const output = await new Promise((resolve, reject) => {
+                exec(dockerCmd, { timeout: 15000 }, (err, stdout, stderr) => {
+                    if (err) return reject(err);
+                    resolve(stdout ? stdout.trim() : '');
+                });
+            });
+            if (output) {
+                updatedEntries = JSON.parse(output);
             }
+        } catch (e) {
+            console.error('[BroadlinkSync] Error actualizando en Docker:', e.message);
+        }
 
-            if (changed) {
-                fs.writeFileSync(configEntriesPath, JSON.stringify(data, null, 2), 'utf8');
-                for (const item of updatedEntries) {
-                    try {
-                        await fetch(`${HA_URL}/api/services/homeassistant/reload_config_entry`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${HA_TOKEN}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ entry_id: item.entry_id })
-                        });
-                    } catch (e) {
-                        console.error(`[BroadlinkSync] Error recargando ${item.title}:`, e.message);
-                    }
-                }
+        // Recargar entradas modificadas en Home Assistant
+        for (const item of updatedEntries) {
+            try {
+                await fetch(`${HA_URL}/api/services/homeassistant/reload_config_entry`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ entry_id: item.id })
+                });
+                console.log(`[BroadlinkSync] Recargado en HA: ${item.title} -> ${item.new}`);
+            } catch (e) {
+                console.error(`[BroadlinkSync] Error recargando ${item.title}:`, e.message);
             }
         }
 
