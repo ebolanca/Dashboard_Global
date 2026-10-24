@@ -133,7 +133,7 @@ app.get('/api/docker/logs', (req, res) => {
 });
 
 app.post('/api/docker/restart', (req, res) => {
-    const container = req.body.name || 'spotdl-sync';
+    const container = req.query.name || (req.body && req.body.name) || 'spotdl-sync';
     const { exec } = require('child_process');
     exec('docker restart ' + container, (err, stdout, stderr) => {
         if (err) return res.status(500).json({ error: err.message });
