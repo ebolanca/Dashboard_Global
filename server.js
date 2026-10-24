@@ -148,6 +148,63 @@ app.get('/api/diag', (req, res) => {
     });
 });
 
+// Métricas de discos locales (Espacio e I/O en tiempo real)
+let cachedDisksData = [];
+function updateDisksMetrics() {
+    const drives = ['C:', 'D:'];
+    const results = [];
+
+    for (const drive of drives) {
+        try {
+            const stats = fs.statfsSync(drive + '/');
+            const total = stats.bsize * stats.blocks;
+            const free = stats.bsize * stats.bfree;
+            const used = total - free;
+            if (total > 0) {
+                results.push({
+                    drive: drive,
+                    label: drive === 'C:' ? 'Sistema' : 'Datos',
+                    totalGB: +(total / 1073741824).toFixed(1),
+                    usedGB: +(used / 1073741824).toFixed(1),
+                    freeGB: +(free / 1073741824).toFixed(1),
+                    usedPercent: +((used / total) * 100).toFixed(1),
+                    readMBs: 0,
+                    writeMBs: 0,
+                    busyPercent: 0
+                });
+            }
+        } catch (e) {}
+    }
+
+    const { exec } = require('child_process');
+    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_PerfFormattedData_PerfDisk_LogicalDisk | Where-Object Name -match '^[C-Z]:' | Select-Object Name, DiskReadBytesPersec, DiskWriteBytesPersec, PercentDiskTime | ConvertTo-Json -Compress"`;
+    
+    exec(cmd, { timeout: 4000, windowsHide: true }, (err, stdout) => {
+        if (!err && stdout && stdout.trim()) {
+            try {
+                let parsed = JSON.parse(stdout.trim());
+                if (!Array.isArray(parsed)) parsed = [parsed];
+                for (const item of parsed) {
+                    const match = results.find(r => r.drive.toUpperCase() === (item.Name || '').toUpperCase());
+                    if (match) {
+                        match.readMBs = +((item.DiskReadBytesPersec || 0) / 1048576).toFixed(1);
+                        match.writeMBs = +((item.DiskWriteBytesPersec || 0) / 1048576).toFixed(1);
+                        match.busyPercent = Math.min(100, Math.round(item.PercentDiskTime || 0));
+                    }
+                }
+            } catch (e) {}
+        }
+        cachedDisksData = results;
+    });
+}
+
+updateDisksMetrics();
+setInterval(updateDisksMetrics, 2500);
+
+app.get('/api/hardware/disks', (req, res) => {
+    res.json(cachedDisksData);
+});
+
 app.post('/api/display/mode', (req, res) => {
     const mode = req.body.mode || 'internal';
     const { exec } = require('child_process');
