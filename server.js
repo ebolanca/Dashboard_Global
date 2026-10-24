@@ -207,14 +207,8 @@ app.get('/api/hardware/disks', (req, res) => {
 
 app.get('/api/diag/docker-space', (req, res) => {
     const { exec } = require('child_process');
-    const cmd = `powershell -NoProfile -Command "
-        $vhdx = Get-ChildItem -Path 'C:\\Users' -Filter '*.vhdx' -Recurse -Depth 5 -ErrorAction SilentlyContinue | Select-Object FullName, @{Name='GB';Expression={[math]::Round($_.Length/1GB,2)}};
-        $dockerDf = docker system df 2>&1;
-        $jellyfinInspect = docker inspect jellyfin 2>&1 | ConvertFrom-Json;
-        $jellyfinMounts = $jellyfinInspect.Mounts | Select-Object Type, Source, Destination;
-        @{ vhdx = $vhdx; dockerDf = $dockerDf; jellyfinMounts = $jellyfinMounts } | ConvertTo-Json -Depth 4
-    "`;
-    exec(cmd, { timeout: 25000, maxBuffer: 10*1024*1024 }, (err, stdout, stderr) => {
+    const cmd = `powershell -NoProfile -Command "$v = Get-ChildItem -Path 'C:\\Users' -Filter '*.vhdx' -Recurse -Depth 6 -ErrorAction SilentlyContinue | Select-Object FullName, @{N='GB';E={[math]::Round($_.Length/1GB,2)}}; $d = (docker system df 2>&1 | Out-String); $j = (docker inspect jellyfin 2>&1 | ConvertFrom-Json); $m = $j.Mounts | Select-Object Type, Source, Destination; @{ vhdx = $v; dockerDf = $d; jellyfinMounts = $m } | ConvertTo-Json -Compress"`;
+    exec(cmd, { timeout: 35000, maxBuffer: 10*1024*1024, windowsHide: true }, (err, stdout, stderr) => {
         try {
             res.json(JSON.parse(stdout));
         } catch(e) {
