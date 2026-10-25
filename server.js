@@ -1279,15 +1279,35 @@ function discoverBroadlinkDevices(timeout = 2500) {
     });
 }
 
+function getArpTable() {
+    return new Promise((resolve) => {
+        exec('arp -a', { timeout: 3000 }, (err, stdout) => {
+            if (err || !stdout) return resolve({});
+            const map = {};
+            const lines = stdout.split('\n');
+            for (const line of lines) {
+                const match = line.trim().match(/([0-9.]+)\s+([0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2})/);
+                if (match) {
+                    const ip = match[1];
+                    const mac = match[2].toLowerCase().replace(/-/g, ':');
+                    map[mac] = ip;
+                }
+            }
+            resolve(map);
+        });
+    });
+}
+
 app.all('/api/broadlink/sync', async (req, res) => {
     try {
         const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWY4MjZlYzQ1ZDU0YzYyOGFmMmEzYjY3MGM2ZjEzYSIsImlhdCI6MTc4NzgzNzUzNCwiZXhwIjoyMTAzMTk3NTM0fQ.ezj0ggwJqpqIOR05MFkMEg9SbjDM4XMcTpmHLDpxLFA';
         const HA_URL = 'http://100.95.217.45:8123';
-        const HA_CONFIG_PATH = IS_MSI 
-            ? '\\\\100.95.217.45\\omen D\\Docker\\media-server\\config\\homeassistant'
-            : 'd:/Docker/media-server/config/homeassistant';
 
-        const devices = await discoverBroadlinkDevices(2500);
+        const [devices, arpMap] = await Promise.all([
+            discoverBroadlinkDevices(2500),
+            getArpTable()
+        ]);
+
         const macMap = {};
         for (const d of devices) {
             macMap[d.mac.toLowerCase()] = d.host;
@@ -1302,15 +1322,24 @@ with open(p, 'r', encoding='utf-8') as f:
     d = json.load(f)
 
 mac_map = ${JSON.stringify(macMap)}
+arp_map = ${JSON.stringify(arpMap)}
 updated = []
 
 for e in d['data']['entries']:
+    # Sincronizar Broadlink
     if e.get('domain') == 'broadlink' and e.get('data', {}).get('mac'):
         m = e['data']['mac'].lower()
         if m in mac_map and e['data']['host'] != mac_map[m]:
             old_h = e['data']['host']
             e['data']['host'] = mac_map[m]
             updated.append({'id': e['entry_id'], 'title': e['title'], 'old': old_h, 'new': mac_map[m]})
+    # Sincronizar Magic Home (flux_led)
+    elif e.get('domain') == 'flux_led':
+        uid = e.get('unique_id', '').lower()
+        if uid in arp_map and e.get('data', {}).get('host') != arp_map[uid]:
+            old_h = e['data']['host']
+            e['data']['host'] = arp_map[uid]
+            updated.append({'id': e['entry_id'], 'title': e['title'], 'old': old_h, 'new': arp_map[uid]})
 
 if updated:
     with open(p, 'w', encoding='utf-8') as f:
@@ -1331,25 +1360,25 @@ print(json.dumps(updated))
                 updatedEntries = JSON.parse(output);
             }
         } catch (e) {
-            console.error('[BroadlinkSync] Error actualizando en Docker:', e.message);
+            console.error('[DeviceSync] Error actualizando en Docker:', e.message);
         }
 
-        // Recargar entradas modificadas o reiniciar contenedor de HA si hubo cambios de IP
+        // Recargar o reiniciar contenedor de HA si hubo cambios de IP
         if (updatedEntries.length > 0) {
-            console.log(`[BroadlinkSync] Se detectaron ${updatedEntries.length} cambios de IP. Reiniciando contenedor Home Assistant...`);
+            console.log(`[DeviceSync] Se detectaron ${updatedEntries.length} cambios de IP. Reiniciando contenedor Home Assistant...`);
             try {
                 await new Promise((resolve) => {
                     exec('docker restart homeassistant', { timeout: 30000 }, (err) => {
-                        if (err) console.error('[BroadlinkSync] Error docker restart:', err.message);
+                        if (err) console.error('[DeviceSync] Error docker restart:', err.message);
                         resolve();
                     });
                 });
-                console.log('[BroadlinkSync] Contenedor Home Assistant reiniciado con éxito con las nuevas IPs.');
+                console.log('[DeviceSync] Contenedor Home Assistant reiniciado con éxito con las nuevas IPs.');
             } catch (e) {
-                console.error('[BroadlinkSync] Fallo al reiniciar HA:', e.message);
+                console.error('[DeviceSync] Fallo al reiniciar HA:', e.message);
             }
         } else {
-            console.log('[BroadlinkSync] Las IPs ya estaban sincronizadas. No se requiere reinicio.');
+            console.log('[DeviceSync] Las IPs ya estaban sincronizadas. No se requiere reinicio.');
         }
 
         const helperMap = {
@@ -1377,6 +1406,15 @@ print(json.dumps(updated))
         }
 
         try {
+            let notifMsg = `Mandos detectados en red local:\n- Salón: ${macMap['a043b05e9be5'] || 'No detectado'}\n- Papa: ${macMap['34ea3443d599'] || 'No detectado'}\n- Naomi: ${macMap['24dfa74fc7b1'] || 'No detectado'}`;
+            if (arpMap['74:88:a8:42:f2:27']) {
+                notifMsg += `\n\nLuces Magic Home:\n- Cabecero: ${arpMap['74:88:a8:42:f2:27']}`;
+            }
+            if (arpMap['74:88:a8:43:05:0f']) {
+                notifMsg += `\n- Cama Aroa: ${arpMap['74:88:a8:43:05:0f']}`;
+            }
+            notifMsg += (updatedEntries.length > 0 ? `\n\n🔄 Se han actualizado ${updatedEntries.length} IPs desincronizadas en Home Assistant.` : `\n\n✅ Todas las IPs están sincronizadas y operativas.`);
+
             await fetch(`${HA_URL}/api/services/persistent_notification/create`, {
                 method: 'POST',
                 headers: {
@@ -1384,8 +1422,8 @@ print(json.dumps(updated))
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    title: 'Mandos RM Sincronizados',
-                    message: `Mandos detectados en red local:\n- Salón: ${macMap['a043b05e9be5'] || 'No detectado'}\n- Papa: ${macMap['34ea3443d599'] || 'No detectado'}\n- Naomi: ${macMap['24dfa74fc7b1'] || 'No detectado'}` + (updatedEntries.length > 0 ? `\n\n🔄 Se han actualizado las IPs desincronizadas en Home Assistant.` : `\n\n✅ Todas las IPs están sincronizadas y operativas.`),
+                    title: 'Dispositivos Sincronizados',
+                    message: notifMsg,
                     notification_id: 'broadlink_sync'
                 })
             });
@@ -1394,10 +1432,11 @@ print(json.dumps(updated))
         res.json({
             success: true,
             discovered: devices,
+            arpMap,
             updatedEntries
         });
     } catch (err) {
-        console.error('[BroadlinkSync] Error:', err);
+        console.error('[DeviceSync] Error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
