@@ -1443,6 +1443,53 @@ print(json.dumps(updated))
 const PORT = 4000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Dashboard [${PC_NAME}] running on http://localhost:${PORT}`);
+
+    // CHEQUEO AUTOMÁTICO DE IP CADA 5 MINUTOS (SOLO EN OMEN)
+    if (!IS_MSI) {
+        setInterval(async () => {
+            try {
+                const [devices, arpMap] = await Promise.all([
+                    discoverBroadlinkDevices(2000),
+                    getArpTable()
+                ]);
+                const macMap = {};
+                for (const d of devices) macMap[d.mac.toLowerCase()] = d.host;
+
+                const pyCheck = `
+import json
+p = '/config/.storage/core.config_entries'
+with open(p, 'r', encoding='utf-8') as f:
+    d = json.load(f)
+
+mac_map = ${JSON.stringify(macMap)}
+arp_map = ${JSON.stringify(arpMap)}
+diffs = False
+
+for e in d['data']['entries']:
+    if e.get('domain') == 'broadlink' and e.get('data', {}).get('mac'):
+        m = e['data']['mac'].lower()
+        if m in mac_map and e['data']['host'] != mac_map[m]:
+            diffs = True
+            break
+    elif e.get('domain') == 'flux_led':
+        uid = e.get('unique_id', '').lower()
+        if uid in arp_map and e.get('data', {}).get('host') != arp_map[uid]:
+            diffs = True
+            break
+
+print("DIFF" if diffs else "OK")
+`;
+                const b64 = Buffer.from(pyCheck).toString('base64');
+                const dockerCmd = `docker exec homeassistant python3 -c "import base64; exec(base64.b64decode('${b64}').decode('utf-8'))"`;
+                exec(dockerCmd, { timeout: 10000 }, (err, stdout) => {
+                    if (!err && stdout && stdout.trim() === 'DIFF') {
+                        console.log('[AutoSync] Cambio de IPs detectado automáticamente. Reparando...');
+                        fetch('http://127.0.0.1:4000/api/broadlink/sync', { method: 'POST' }).catch(() => {});
+                    }
+                });
+            } catch (e) {}
+        }, 5 * 60 * 1000);
+    }
 });
 
 
