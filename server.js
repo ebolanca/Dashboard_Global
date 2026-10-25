@@ -1238,7 +1238,23 @@ function discoverBroadlinkDevices(timeout = 2500) {
             }
             packet.writeUInt16LE(checksum, 0x20);
 
+            // Enviar broadcast global y también broadcast a la subred LAN física (192.168.1.255)
             socket.send(packet, 0, packet.length, 80, '255.255.255.255');
+            socket.send(packet, 0, packet.length, 80, '192.168.1.255');
+            try {
+                const ifaces = os.networkInterfaces();
+                for (const name of Object.keys(ifaces)) {
+                    for (const net of ifaces[name]) {
+                        if (net.family === 'IPv4' && !net.internal && net.address.startsWith('192.168.')) {
+                            const parts = net.address.split('.');
+                            const subnetBc = `${parts[0]}.${parts[1]}.${parts[2]}.255`;
+                            if (subnetBc !== '192.168.1.255') {
+                                socket.send(packet, 0, packet.length, 80, subnetBc);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
         });
 
         socket.on('message', (msg, rinfo) => {
@@ -1318,21 +1334,22 @@ print(json.dumps(updated))
             console.error('[BroadlinkSync] Error actualizando en Docker:', e.message);
         }
 
-        // Recargar entradas modificadas en Home Assistant
-        for (const item of updatedEntries) {
+        // Recargar entradas modificadas o reiniciar contenedor de HA si hubo cambios de IP
+        if (updatedEntries.length > 0) {
+            console.log(`[BroadlinkSync] Se detectaron ${updatedEntries.length} cambios de IP. Reiniciando contenedor Home Assistant...`);
             try {
-                await fetch(`${HA_URL}/api/services/homeassistant/reload_config_entry`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${HA_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ entry_id: item.id })
+                await new Promise((resolve) => {
+                    exec('docker restart homeassistant', { timeout: 30000 }, (err) => {
+                        if (err) console.error('[BroadlinkSync] Error docker restart:', err.message);
+                        resolve();
+                    });
                 });
-                console.log(`[BroadlinkSync] Recargado en HA: ${item.title} -> ${item.new}`);
+                console.log('[BroadlinkSync] Contenedor Home Assistant reiniciado con éxito con las nuevas IPs.');
             } catch (e) {
-                console.error(`[BroadlinkSync] Error recargando ${item.title}:`, e.message);
+                console.error('[BroadlinkSync] Fallo al reiniciar HA:', e.message);
             }
+        } else {
+            console.log('[BroadlinkSync] Las IPs ya estaban sincronizadas. No se requiere reinicio.');
         }
 
         const helperMap = {
