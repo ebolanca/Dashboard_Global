@@ -15,8 +15,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 const HOSTNAME = os.hostname();
 const IS_MSI = HOSTNAME === 'PC-MSI';
 const PC_NAME = IS_MSI ? 'MSI' : 'OMEN';
-const WORKSPACE_DIR = IS_MSI ? 'c:/Users/MSI Roberto/Documents/GitHub' : 'd:/03_Trabajo';
-const REMOTE_SERVER_IP = '100.95.217.45';
+const WORKSPACE_DIR = IS_MSI ? 'c:/Users/MSI Roberto/Documents/GitHub' : (process.platform === 'win32' ? 'd:/03_Trabajo' : '/mnt/d/03_Trabajo');
+const REMOTE_SERVER_IP = '100.95.0.24';
 
 app.get('/api/config', (req, res) => {
     res.json({ 
@@ -337,22 +337,31 @@ app.post('/api/dashboard/restart', (req, res) => {
     });
 });
 
-app.get('/api/projects', async (req, res) => {
+let cachedProjects = [];
+let isScanningProjects = false;
+let lastProjectsScanTime = 0;
+
+async function scanProjects(force = false) {
+    if (isScanningProjects) return cachedProjects;
+    if (!force && cachedProjects.length > 0 && (Date.now() - lastProjectsScanTime < 10000)) {
+        return cachedProjects;
+    }
+    isScanningProjects = true;
     try {
-        if (!fs.existsSync(WORKSPACE_DIR)) {
-            return res.status(404).json({ error: `Workspace directory not found: ${WORKSPACE_DIR}` });
-        }
+        if (!fs.existsSync(WORKSPACE_DIR)) return [];
 
         const folders = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true })
             .filter(dirent => dirent.isDirectory())
             .map(dirent => dirent.name);
 
-        const results = await Promise.all(folders.map(async (f) => {
+        const results = [];
+
+        for (const f of folders) {
             const projectPath = path.join(WORKSPACE_DIR, f);
             const gitPath = path.join(projectPath, '.git');
             
             if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || f.toLowerCase() === 'spam_cleaner' || !fs.existsSync(gitPath)) {
-                return [];
+                continue;
             }
             
             let status, log, lastCommit = 'No commits';
@@ -364,7 +373,6 @@ app.get('/api/projects', async (req, res) => {
                 log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
                 lastCommit = log.latest ? log.latest.message : 'No commits';
 
-                // Extracción de versión mejorada
                 let version = 'v?';
                 const versionPaths = [
                     path.join(projectPath, 'public', 'js', 'modules', 'constants.js'),
@@ -380,7 +388,7 @@ app.get('/api/projects', async (req, res) => {
                         const content = fs.readFileSync(vPath, 'utf8');
                         const lines = content.split('\n');
                         let found = false;
-                        for(let line of lines) {
+                        for (let line of lines) {
                             if (line.trim().startsWith('//')) continue;
                             const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/) || 
                                             line.match(/version:\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/);
@@ -392,7 +400,6 @@ app.get('/api/projects', async (req, res) => {
                     }
                 }
                 
-                // Excluir bases de datos dinámicas/cachés (ej. data/ en Musica) del conteo de cambios locales
                 const relevantFiles = (status.files || []).filter(file => {
                     const p = (file.path || '').replace(/\\/g, '/');
                     if (f.toLowerCase() === 'musica' && (p.startsWith('data/') || p.includes('lyrics_') || p.includes('metadata_cache'))) return false;
@@ -431,7 +438,7 @@ app.get('/api/projects', async (req, res) => {
                         return 'v?';
                     };
 
-                    return [
+                    results.push(
                         { 
                             name: "Alquileres (Garlopan)", 
                             url: "https://alquiler-pisos-23550.web.app", 
@@ -448,7 +455,7 @@ app.get('/api/projects', async (req, res) => {
                             ...baseInfo,
                             version: getSubProjectVersion('public - lestudi')
                         }
-                    ];
+                    );
                 } else {
                     const displayNameMap = {
                         'conciertos': 'Conciertos',
@@ -472,14 +479,14 @@ app.get('/api/projects', async (req, res) => {
                         'drop': 'fa-paperclip'
                     };
                     
-                    const localBase = (port) => IS_MSI ? `http://localhost:${port}` : `http://${REMOTE_SERVER_IP}:${port}`;
+                    const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
 
                     const urlsMap = {
                         'Horarios': 'https://horarios-rail.web.app',
                         'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
                         'Vacaciones': 'https://viajes-en-caravana.web.app/',
-                        'Domotica': 'http://100.95.217.45:8123',
-                        'domotica': 'http://100.95.217.45:8123',
+                        'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                        'domotica': `http://${REMOTE_SERVER_IP}:8123`,
                         'conciertos': localBase(8086),
                         'Conciertos': localBase(8086),
                         'Musica': localBase(8087),
@@ -488,7 +495,7 @@ app.get('/api/projects', async (req, res) => {
                         'subastas': localBase(4005) + '/',
                         'Drop': localBase(5050),
                         'drop': localBase(5050),
-                        'Dashboard_Global': localBase(4000)
+                        'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                     };
 
                     let firebaseProjectId = f.toLowerCase();
@@ -506,17 +513,17 @@ app.get('/api/projects', async (req, res) => {
 
                     const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
 
-                    return [{
+                    results.push({
                         name: displayNameMap[f] || f,
                         url: urlsMap[f] || '#',
                         consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
                         icon: iconsMap[f] || 'fa-folder',
                         ...baseInfo
-                    }];
+                    });
                 }
             } catch (e) {
                 console.error(`Error checking git for ${f}`, e);
-                const localBase = (port) => IS_MSI ? `http://localhost:${port}` : `http://${REMOTE_SERVER_IP}:${port}`;
+                const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
                 const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
                 const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal' };
                 const urlsMap = { 
@@ -527,21 +534,49 @@ app.get('/api/projects', async (req, res) => {
                     'subastas': localBase(4005) + '/',
                     'Drop': localBase(5050),
                     'drop': localBase(5050),
-                    'Domotica': 'http://100.95.217.45:8123',
-                    'domotica': 'http://100.95.217.45:8123',
-                    'Dashboard_Global': localBase(4000)
+                    'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                    'domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                    'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                 };
-                return [{ 
+                results.push({ 
                     name: displayNameMap[f] || f, 
                     url: urlsMap[f] || '#',
                     icon: iconsMap[f] || 'fa-folder',
                     error: 'Git error', 
                     details: e.message 
-                }];
+                });
             }
-        }));
+        }
 
-        const projects = results.flat();
+        cachedProjects = results;
+        lastProjectsScanTime = Date.now();
+        return cachedProjects;
+    } catch (e) {
+        console.error('Error in scanProjects:', e);
+        return cachedProjects;
+    } finally {
+        isScanningProjects = false;
+    }
+}
+
+// Iniciar escaneo inicial inmediatamente
+setTimeout(() => { scanProjects(true).catch(() => {}); }, 1000);
+
+app.get('/api/projects', async (req, res) => {
+    try {
+        if (!fs.existsSync(WORKSPACE_DIR)) {
+            return res.status(404).json({ error: `Workspace directory not found: ${WORKSPACE_DIR}` });
+        }
+
+        if (cachedProjects.length > 0 && req.query.fresh !== 'true') {
+            res.json(cachedProjects);
+            if (Date.now() - lastProjectsScanTime > 30000) {
+                scanProjects().catch(() => {});
+            }
+            return;
+        }
+
+        const projects = await scanProjects(req.query.fresh === 'true');
         res.json(projects);
     } catch (e) {
         res.status(500).json({ error: 'Cannot read workspace directory', details: e.message });
@@ -1183,6 +1218,7 @@ async function fetchAllGitRepositories() {
                 }
             }
         }
+        await scanProjects(true).catch(() => {});
     } catch (err) {
         console.error('Error en fetchAllGitRepositories:', err.message);
     } finally {
@@ -1301,7 +1337,7 @@ function getArpTable() {
 app.all('/api/broadlink/sync', async (req, res) => {
     try {
         const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjMWY4MjZlYzQ1ZDU0YzYyOGFmMmEzYjY3MGM2ZjEzYSIsImlhdCI6MTc4NzgzNzUzNCwiZXhwIjoyMTAzMTk3NTM0fQ.ezj0ggwJqpqIOR05MFkMEg9SbjDM4XMcTpmHLDpxLFA';
-        const HA_URL = 'http://100.95.217.45:8123';
+        const HA_URL = `http://${REMOTE_SERVER_IP}:8123`;
 
         const [devices, arpMap] = await Promise.all([
             discoverBroadlinkDevices(2500),

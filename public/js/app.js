@@ -500,10 +500,14 @@ async function init() {
         // Actualizar UI con nombre de PC
         document.getElementById('pc-name-display').innerText = config.pcName;
         
-        // Marcar pestaña activa
+        // Marcar pestaña activa y actualizar enlace OMEN dinámicamente
         const currentPC = config.pcName.toLowerCase();
         const tabEl = document.getElementById(`tab-${currentPC}`);
         if (tabEl) tabEl.classList.add('active');
+        const tabOmen = document.getElementById('tab-omen');
+        if (tabOmen && config.remoteServerIp) {
+            tabOmen.href = `http://${config.remoteServerIp}:4000`;
+        }
 
         // Configurar listeners de la barra de control
         setupToolbarEvents();
