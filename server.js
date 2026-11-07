@@ -16,7 +16,7 @@ const HOSTNAME = os.hostname();
 const IS_MSI = HOSTNAME === 'PC-MSI';
 const PC_NAME = IS_MSI ? 'MSI' : 'OMEN';
 const WORKSPACE_DIR = IS_MSI ? 'c:/Users/MSI Roberto/Documents/GitHub' : (process.platform === 'win32' ? 'd:/03_Trabajo' : '/mnt/d/03_Trabajo');
-const REMOTE_SERVER_IP = '100.95.0.24';
+const REMOTE_SERVER_IP = 'portatil-omen';
 
 app.get('/api/config', (req, res) => {
     res.json({ 
