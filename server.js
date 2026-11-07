@@ -5,6 +5,9 @@ const simpleGit = require('simple-git');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { exec, execFile } = require('child_process');
+
+const DOCKER_BIN = process.platform === 'win32' ? 'docker.exe' : 'docker';
 
 const app = express();
 app.use(cors());
@@ -114,7 +117,7 @@ app.get('/api/paperless/stats', (req, res) => {
 app.post('/api/paperless/restart', (req, res) => {
     console.log('🔄 Reiniciando contenedor paperless-ai a petición de la UI...');
     paperlessCache = null; // Limpiar caché
-    execFile('docker.exe', ['restart', 'paperless-ai'], { timeout: 30000, windowsHide: true }, (err) => {
+    execFile(DOCKER_BIN, ['restart', 'paperless-ai'], { timeout: 30000, windowsHide: true }, (err) => {
         if (err) {
             console.error('Error al reiniciar paperless-ai:', err);
             return res.status(500).json({ error: 'Fallo al reiniciar contenedor paperless-ai', details: err.message });
@@ -1191,11 +1194,10 @@ app.delete('/api/whatsapp/inbox', (req, res) => {
 });
 
 // --- API CONTROL DOCKER ---
-const { execFile } = require('child_process');
 const http = require('http');
 
 app.get('/api/docker/status', (req, res) => {
-    execFile('docker.exe', ['ps', '-a', '--format', '{{.Names}}::{{.State}}'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+    execFile(DOCKER_BIN, ['ps', '-a', '--format', '{{.Names}}::{{.State}}'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
         if (err) {
             return res.status(500).json({ error: 'Failed to query docker ps', details: err.message });
         }
@@ -1209,7 +1211,7 @@ app.get('/api/docker/status', (req, res) => {
             }
         });
 
-        // Soporte AdGuard Home (Servicio Windows / PM2 en puerto 8084)
+        // Soporte AdGuard Home (Servicio Windows / Linux en puerto 8084)
         let answered = false;
         const sendStatus = (state) => {
             if (answered) return;
@@ -1239,14 +1241,17 @@ app.post('/api/docker/toggle', (req, res) => {
         return res.status(400).json({ error: 'Invalid container name format' });
     }
 
-    // Caso especial: AdGuard Home administrado por PM2 en Windows
+    // Caso especial: AdGuard Home administrado por PM2 en Windows o systemd en Linux
     if (container === 'adguard-home') {
         let answeredToggle = false;
         const doToggle = (action) => {
             if (answeredToggle) return;
             answeredToggle = true;
-            console.log(`🛡️ ${action === 'stop' ? 'Deteniendo' : 'Iniciando'} AdGuard Home en PM2...`);
-            execFile('cmd.exe', ['/c', `pm2 ${action} adguard-home`], { timeout: 10000, windowsHide: true }, (actionErr) => {
+            console.log(`🛡️ ${action === 'stop' ? 'Deteniendo' : 'Iniciando'} AdGuard Home...`);
+            const cmd = process.platform === 'win32' 
+                ? `pm2 ${action} adguard-home` 
+                : `sudo systemctl ${action} AdGuardHome`;
+            exec(cmd, { timeout: 10000 }, (actionErr) => {
                 if (actionErr) {
                     return res.status(500).json({ error: `Failed to ${action} adguard-home`, details: actionErr.message });
                 }
@@ -1263,15 +1268,15 @@ app.post('/api/docker/toggle', (req, res) => {
         return;
     }
 
-    execFile('docker.exe', ['inspect', '--format={{.State.Running}}', container], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+    execFile(DOCKER_BIN, ['inspect', '--format={{.State.Running}}', container], { timeout: 5000, windowsHide: true }, (err, stdout) => {
         if (err) {
             return res.status(404).json({ error: `Container ${container} not found` });
         }
         const isRunning = (stdout || '').trim() === 'true';
         const action = isRunning ? 'stop' : 'start';
 
-        console.log(`🐳 Ejecutando comando Docker: docker.exe ${action} ${container}`);
-        execFile('docker.exe', [action, container], { timeout: 30000, windowsHide: true }, (actionErr) => {
+        console.log(`🐳 Ejecutando comando Docker: ${DOCKER_BIN} ${action} ${container}`);
+        execFile(DOCKER_BIN, [action, container], { timeout: 30000, windowsHide: true }, (actionErr) => {
             if (actionErr) {
                 console.error(`Error al alternar estado de ${container}:`, actionErr);
                 return res.status(500).json({ error: `Failed to ${action} ${container}`, details: actionErr.message });
@@ -1401,6 +1406,25 @@ function discoverBroadlinkDevices(timeout = 2500) {
 
 function getArpTable() {
     return new Promise((resolve) => {
+        if (process.platform === 'linux') {
+            try {
+                if (fs.existsSync('/proc/net/arp')) {
+                    const content = fs.readFileSync('/proc/net/arp', 'utf8');
+                    const map = {};
+                    const lines = content.split('\n').slice(1);
+                    for (const line of lines) {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length >= 4 && parts[3] !== '00:00:00:00:00:00') {
+                            const ip = parts[0];
+                            const mac = parts[3].toLowerCase();
+                            map[mac] = ip;
+                        }
+                    }
+                    return resolve(map);
+                }
+            } catch (e) {}
+        }
+
         exec('arp -a', { timeout: 3000 }, (err, stdout) => {
             if (err || !stdout) return resolve({});
             const map = {};
