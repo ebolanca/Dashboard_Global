@@ -150,52 +150,128 @@ app.get('/api/diag', (req, res) => {
 
 // Métricas de discos locales (Espacio e I/O en tiempo real)
 let cachedDisksData = [];
+let prevLinuxDiskStats = null;
+let prevLinuxDiskTime = 0;
+
 function updateDisksMetrics() {
-    const drives = ['C:', 'D:'];
+    const isWin = process.platform === 'win32';
     const results = [];
 
-    for (const drive of drives) {
-        try {
-            const stats = fs.statfsSync(drive + '/');
-            const total = stats.bsize * stats.blocks;
-            const free = stats.bsize * stats.bfree;
-            const used = total - free;
-            if (total > 0) {
-                results.push({
-                    drive: drive,
-                    label: drive === 'C:' ? 'Sistema' : 'Datos',
-                    totalGB: +(total / 1073741824).toFixed(1),
-                    usedGB: +(used / 1073741824).toFixed(1),
-                    freeGB: +(free / 1073741824).toFixed(1),
-                    usedPercent: +((used / total) * 100).toFixed(1),
-                    readMBs: 0,
-                    writeMBs: 0,
-                    busyPercent: 0
-                });
-            }
-        } catch (e) {}
-    }
-
-    const { exec } = require('child_process');
-    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_PerfFormattedData_PerfDisk_LogicalDisk | Where-Object Name -match '^[C-Z]:' | Select-Object Name, DiskReadBytesPersec, DiskWriteBytesPersec, PercentDiskTime | ConvertTo-Json -Compress"`;
-    
-    exec(cmd, { timeout: 4000, windowsHide: true }, (err, stdout) => {
-        if (!err && stdout && stdout.trim()) {
+    if (isWin) {
+        const drives = ['C:', 'D:'];
+        for (const drive of drives) {
             try {
-                let parsed = JSON.parse(stdout.trim());
-                if (!Array.isArray(parsed)) parsed = [parsed];
-                for (const item of parsed) {
-                    const match = results.find(r => r.drive.toUpperCase() === (item.Name || '').toUpperCase());
-                    if (match) {
-                        match.readMBs = +((item.DiskReadBytesPersec || 0) / 1048576).toFixed(1);
-                        match.writeMBs = +((item.DiskWriteBytesPersec || 0) / 1048576).toFixed(1);
-                        match.busyPercent = Math.min(100, Math.round(item.PercentDiskTime || 0));
-                    }
+                const stats = fs.statfsSync(drive + '/');
+                const total = stats.bsize * stats.blocks;
+                const free = stats.bsize * stats.bfree;
+                const used = total - free;
+                if (total > 0) {
+                    results.push({
+                        drive: drive,
+                        label: drive === 'C:' ? 'Sistema' : 'Datos',
+                        totalGB: +(total / 1073741824).toFixed(1),
+                        usedGB: +(used / 1073741824).toFixed(1),
+                        freeGB: +(free / 1073741824).toFixed(1),
+                        usedPercent: +((used / total) * 100).toFixed(1),
+                        readMBs: 0,
+                        writeMBs: 0,
+                        busyPercent: 0
+                    });
                 }
             } catch (e) {}
         }
+
+        const { exec } = require('child_process');
+        const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_PerfFormattedData_PerfDisk_LogicalDisk | Where-Object Name -match '^[C-Z]:' | Select-Object Name, DiskReadBytesPersec, DiskWriteBytesPersec, PercentDiskTime | ConvertTo-Json -Compress"`;
+        exec(cmd, { timeout: 4000, windowsHide: true }, (err, stdout) => {
+            if (!err && stdout && stdout.trim()) {
+                try {
+                    let parsed = JSON.parse(stdout.trim());
+                    if (!Array.isArray(parsed)) parsed = [parsed];
+                    for (const item of parsed) {
+                        const match = results.find(r => r.drive.toUpperCase() === (item.Name || '').toUpperCase());
+                        if (match) {
+                            match.readMBs = +((item.DiskReadBytesPersec || 0) / 1048576).toFixed(1);
+                            match.writeMBs = +((item.DiskWriteBytesPersec || 0) / 1048576).toFixed(1);
+                            match.busyPercent = Math.min(100, Math.round(item.PercentDiskTime || 0));
+                        }
+                    }
+                } catch (e) {}
+            }
+            cachedDisksData = results;
+        });
+    } else {
+        // Linux (OMEN)
+        const mountPoints = [
+            { path: '/', drive: 'C:', label: 'Sistema' },
+            { path: '/mnt/d', drive: 'D:', label: 'Datos' }
+        ];
+
+        for (const mp of mountPoints) {
+            try {
+                const stats = fs.statfsSync(mp.path);
+                const total = stats.bsize * stats.blocks;
+                const free = stats.bsize * stats.bfree;
+                const used = total - free;
+                if (total > 0) {
+                    results.push({
+                        drive: mp.drive,
+                        label: mp.label,
+                        totalGB: +(total / 1073741824).toFixed(1),
+                        usedGB: +(used / 1073741824).toFixed(1),
+                        freeGB: +(free / 1073741824).toFixed(1),
+                        usedPercent: +((used / total) * 100).toFixed(1),
+                        readMBs: 0,
+                        writeMBs: 0,
+                        busyPercent: 0
+                    });
+                }
+            } catch (e) {}
+        }
+
+        try {
+            const now = Date.now();
+            const raw = fs.readFileSync('/proc/diskstats', 'utf-8');
+            const lines = raw.trim().split('\n');
+            const currentStats = {};
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                const dev = parts[2];
+                if (dev === 'nvme0n1' || dev === 'sda') {
+                    currentStats[dev] = {
+                        readSectors: parseInt(parts[5], 10) || 0,
+                        writeSectors: parseInt(parts[9], 10) || 0,
+                        ioTicks: parseInt(parts[12], 10) || 0
+                    };
+                }
+            }
+            if (prevLinuxDiskStats && prevLinuxDiskTime > 0) {
+                const dt = (now - prevLinuxDiskTime) / 1000;
+                if (dt > 0) {
+                    const devMap = { 'nvme0n1': 'C:', 'sda': 'D:' };
+                    for (const [dev, cur] of Object.entries(currentStats)) {
+                        const prev = prevLinuxDiskStats[dev];
+                        if (prev) {
+                            const readBytes = (cur.readSectors - prev.readSectors) * 512;
+                            const writeBytes = (cur.writeSectors - prev.writeSectors) * 512;
+                            const ioMs = cur.ioTicks - prev.ioTicks;
+                            const drvName = devMap[dev];
+                            const match = results.find(r => r.drive === drvName);
+                            if (match) {
+                                match.readMBs = +Math.max(0, (readBytes / (1048576 * dt))).toFixed(1);
+                                match.writeMBs = +Math.max(0, (writeBytes / (1048576 * dt))).toFixed(1);
+                                match.busyPercent = Math.min(100, Math.round(Math.max(0, (ioMs / (dt * 1000)) * 100)));
+                            }
+                        }
+                    }
+                }
+            }
+            prevLinuxDiskStats = currentStats;
+            prevLinuxDiskTime = now;
+        } catch (e) {}
+
         cachedDisksData = results;
-    });
+    }
 }
 
 updateDisksMetrics();
