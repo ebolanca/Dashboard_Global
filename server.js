@@ -340,223 +340,231 @@ app.post('/api/dashboard/restart', (req, res) => {
 let cachedProjects = [];
 let isScanningProjects = false;
 let lastProjectsScanTime = 0;
+let currentScanPromise = null;
 
 async function scanProjects(force = false) {
-    if (isScanningProjects) return cachedProjects;
-    if (!force && cachedProjects.length > 0 && (Date.now() - lastProjectsScanTime < 10000)) {
+    if (currentScanPromise) return currentScanPromise;
+    if (!force && cachedProjects.length > 0 && (Date.now() - lastProjectsScanTime < 30000)) {
         return cachedProjects;
     }
     isScanningProjects = true;
-    try {
-        if (!fs.existsSync(WORKSPACE_DIR)) return [];
+    currentScanPromise = (async () => {
+        try {
+            if (!fs.existsSync(WORKSPACE_DIR)) return [];
 
-        const folders = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true })
-            .filter(dirent => dirent.isDirectory())
-            .map(dirent => dirent.name);
+            const folders = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true })
+                .filter(dirent => dirent.isDirectory())
+                .map(dirent => dirent.name);
 
-        const results = [];
+            const results = [];
 
-        for (const f of folders) {
-            const projectPath = path.join(WORKSPACE_DIR, f);
-            const gitPath = path.join(projectPath, '.git');
-            
-            if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || f.toLowerCase() === 'spam_cleaner' || !fs.existsSync(gitPath)) {
-                continue;
-            }
-            
-            let status, log, lastCommit = 'No commits';
-            try {
-                const git = simpleGit(projectPath);
-                await git.addConfig('safe.directory', '*', false, 'global').catch(() => {});
+            for (const f of folders) {
+                const projectPath = path.join(WORKSPACE_DIR, f);
+                const gitPath = path.join(projectPath, '.git');
                 
-                status = await git.status();
-                log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
-                lastCommit = log.latest ? log.latest.message : 'No commits';
-
-                let version = 'v?';
-                const versionPaths = [
-                    path.join(projectPath, 'public', 'js', 'modules', 'constants.js'),
-                    path.join(projectPath, 'public-app', 'js', 'main.js'),
-                    path.join(projectPath, 'public', 'js', 'main.js'),
-                    path.join(projectPath, 'package.json'),
-                    path.join(projectPath, 'manifest.json'),
-                    path.join(projectPath, 'public', 'index.html')
-                ];
-
-                for (const vPath of versionPaths) {
-                    if (fs.existsSync(vPath)) {
-                        const content = fs.readFileSync(vPath, 'utf8');
-                        const lines = content.split('\n');
-                        let found = false;
-                        for (let line of lines) {
-                            if (line.trim().startsWith('//')) continue;
-                            const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/) || 
-                                            line.match(/version:\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/);
-                            if (jsMatch) { version = `v${jsMatch[2]}`; found = true; break; }
-                            const pkgMatch = line.match(/"version":\s*"(\d+\.\d+(?:\.\d+)?)"/);
-                            if (pkgMatch) { version = `v${pkgMatch[1]}`; found = true; break; }
-                        }
-                        if (found) break;
-                    }
+                if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || f.toLowerCase() === 'spam_cleaner' || !fs.existsSync(gitPath)) {
+                    continue;
                 }
                 
-                const relevantFiles = (status.files || []).filter(file => {
-                    const p = (file.path || '').replace(/\\/g, '/');
-                    if (f.toLowerCase() === 'musica' && (p.startsWith('data/') || p.includes('lyrics_') || p.includes('metadata_cache'))) return false;
-                    return true;
-                });
-
-                const localChangesCount = relevantFiles.length;
-                const isClean = localChangesCount === 0;
-
-                const baseInfo = {
-                    branch: status.current,
-                    behind: status.behind,
-                    ahead: status.ahead,
-                    localChanges: localChangesCount,
-                    isClean: isClean,
-                    lastCommit: lastCommit,
-                    commitHash: log.latest ? log.latest.hash.substring(0, 7) : null,
-                    commitDate: log.latest ? log.latest.date : null,
-                    version: version,
-                    localPath: projectPath,
-                    githubUrl: `https://github.com/ebolanca/${f}`
-                };
-
-                if (f === 'Alquileres') {
-                    const firebaseLink = "https://console.firebase.google.com/project/alquiler-pisos-23550/overview";
+                let status, log, lastCommit = 'No commits';
+                try {
+                    const git = simpleGit(projectPath);
+                    await git.addConfig('safe.directory', '*', false, 'global').catch(() => {});
                     
-                    const getSubProjectVersion = (subDir) => {
-                        const htmlPath = path.join(projectPath, subDir, 'index.html');
-                        if (fs.existsSync(htmlPath)) {
-                            const content = fs.readFileSync(htmlPath, 'utf8');
-                            const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+(?:\.\d+)?)[^<]*<\/title>/i);
-                            if (titleMatch) return `v${titleMatch[1]}`;
-                            const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"]v?(\d+\.\d+(?:\.\d+)?)['"]/i);
-                            if (appVersionMatch) return `v${appVersionMatch[1]}`;
-                        }
-                        return 'v?';
-                    };
+                    status = await git.status();
+                    log = await git.log({ n: 1 }).catch(() => ({ latest: null }));
+                    lastCommit = log.latest ? log.latest.message : 'No commits';
 
-                    results.push(
-                        { 
-                            name: "Alquileres (Garlopan)", 
-                            url: "https://alquiler-pisos-23550.web.app", 
-                            consoleUrl: firebaseLink, 
-                            icon: 'fa-house',
-                            ...baseInfo,
-                            version: getSubProjectVersion('public - garlopan')
-                        },
-                        { 
-                            name: "Alquileres (L'estudi)", 
-                            url: "https://lestudi.web.app", 
-                            consoleUrl: firebaseLink, 
-                            icon: 'fa-building',
-                            ...baseInfo,
-                            version: getSubProjectVersion('public - lestudi')
-                        }
-                    );
-                } else {
-                    const displayNameMap = {
-                        'conciertos': 'Conciertos',
-                        'subastas': 'Subastas'
-                    };
+                    let version = 'v?';
+                    const versionPaths = [
+                        path.join(projectPath, 'public', 'js', 'modules', 'constants.js'),
+                        path.join(projectPath, 'public-app', 'js', 'main.js'),
+                        path.join(projectPath, 'public', 'js', 'main.js'),
+                        path.join(projectPath, 'package.json'),
+                        path.join(projectPath, 'manifest.json'),
+                        path.join(projectPath, 'public', 'index.html')
+                    ];
 
-                    const iconsMap = {
-                        'Horarios': 'fa-calendar-days',
-                        'Pedidos': 'fa-utensils',
-                        'Vacaciones': 'fa-plane',
-                        'Viajes': 'fa-earth-americas',
-                        'Dashboard_Global': 'fa-gauge-high',
-                        'Domotica': 'fa-house-signal',
-                        'conciertos': 'fa-guitar',
-                        'Conciertos': 'fa-guitar',
-                        'Musica': 'fa-music',
-                        'musica': 'fa-music',
-                        'Subastas': 'fa-gavel',
-                        'subastas': 'fa-gavel',
-                        'Drop': 'fa-paperclip',
-                        'drop': 'fa-paperclip'
-                    };
+                    for (const vPath of versionPaths) {
+                        if (fs.existsSync(vPath)) {
+                            const content = fs.readFileSync(vPath, 'utf8');
+                            const lines = content.split('\n');
+                            let found = false;
+                            for (let line of lines) {
+                                if (line.trim().startsWith('//')) continue;
+                                const jsMatch = line.match(/CURRENT_(APP|CLIENT)_VERSION\s*=\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/) || 
+                                                line.match(/version:\s*["']v?(\d+\.\d+(?:\.\d+)?)["']/);
+                                if (jsMatch) { version = `v${jsMatch[2]}`; found = true; break; }
+                                const pkgMatch = line.match(/"version":\s*"(\d+\.\d+(?:\.\d+)?)"/);
+                                if (pkgMatch) { version = `v${pkgMatch[1]}`; found = true; break; }
+                            }
+                            if (found) break;
+                        }
+                    }
                     
+                    const relevantFiles = (status.files || []).filter(file => {
+                        const p = (file.path || '').replace(/\\/g, '/');
+                        if (f.toLowerCase() === 'musica' && (p.startsWith('data/') || p.includes('lyrics_') || p.includes('metadata_cache'))) return false;
+                        return true;
+                    });
+
+                    const localChangesCount = relevantFiles.length;
+                    const isClean = localChangesCount === 0;
+
+                    const baseInfo = {
+                        branch: status.current,
+                        behind: status.behind,
+                        ahead: status.ahead,
+                        localChanges: localChangesCount,
+                        isClean: isClean,
+                        lastCommit: lastCommit,
+                        commitHash: log.latest ? log.latest.hash.substring(0, 7) : null,
+                        commitDate: log.latest ? log.latest.date : null,
+                        version: version,
+                        localPath: projectPath,
+                        githubUrl: `https://github.com/ebolanca/${f}`
+                    };
+
+                    if (f === 'Alquileres') {
+                        const firebaseLink = "https://console.firebase.google.com/project/alquiler-pisos-23550/overview";
+                        
+                        const getSubProjectVersion = (subDir) => {
+                            const htmlPath = path.join(projectPath, subDir, 'index.html');
+                            if (fs.existsSync(htmlPath)) {
+                                const content = fs.readFileSync(htmlPath, 'utf8');
+                                const metaMatch = content.match(/<meta\s+name=["']version["']\s+content=["']v?(\d+\.\d+(?:\.\d+)?)["']/i);
+                                if (metaMatch) return `v${metaMatch[1]}`;
+                                const titleMatch = content.match(/<title>[^<]*v(\d+\.\d+(?:\.\d+)?)[^<]*<\/title>/i);
+                                if (titleMatch) return `v${titleMatch[1]}`;
+                                const appVersionMatch = content.match(/const\s+APP_VERSION\s*=\s*['"]v?(\d+\.\d+(?:\.\d+)?)['"]/i);
+                                if (appVersionMatch) return `v${appVersionMatch[1]}`;
+                            }
+                            return 'v?';
+                        };
+
+                        results.push(
+                            { 
+                                name: "Alquileres (Garlopan)", 
+                                url: "https://alquiler-pisos-23550.web.app", 
+                                consoleUrl: firebaseLink, 
+                                icon: 'fa-house',
+                                ...baseInfo,
+                                version: getSubProjectVersion('public - garlopan')
+                            },
+                            { 
+                                name: "Alquileres (L'estudi)", 
+                                url: "https://lestudi.web.app", 
+                                consoleUrl: firebaseLink, 
+                                icon: 'fa-building',
+                                ...baseInfo,
+                                version: getSubProjectVersion('public - lestudi')
+                            }
+                        );
+                    } else {
+                        const displayNameMap = {
+                            'conciertos': 'Conciertos',
+                            'subastas': 'Subastas'
+                        };
+
+                        const iconsMap = {
+                            'Horarios': 'fa-calendar-days',
+                            'Pedidos': 'fa-utensils',
+                            'Vacaciones': 'fa-plane',
+                            'Viajes': 'fa-earth-americas',
+                            'Dashboard_Global': 'fa-gauge-high',
+                            'Domotica': 'fa-house-signal',
+                            'conciertos': 'fa-guitar',
+                            'Conciertos': 'fa-guitar',
+                            'Musica': 'fa-music',
+                            'musica': 'fa-music',
+                            'Subastas': 'fa-gavel',
+                            'subastas': 'fa-gavel',
+                            'Drop': 'fa-paperclip',
+                            'drop': 'fa-paperclip'
+                        };
+                        
+                        const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
+
+                        const urlsMap = {
+                            'Horarios': 'https://horarios-rail.web.app',
+                            'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
+                            'Vacaciones': 'https://viajes-en-caravana.web.app/',
+                            'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                            'domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                            'conciertos': localBase(8086),
+                            'Conciertos': localBase(8086),
+                            'Musica': localBase(8087),
+                            'musica': localBase(8087),
+                            'Subastas': localBase(4005) + '/',
+                            'subastas': localBase(4005) + '/',
+                            'Drop': localBase(5050),
+                            'drop': localBase(5050),
+                            'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
+                        };
+
+                        let firebaseProjectId = f.toLowerCase();
+                        const rcPath = path.join(projectPath, '.firebaserc');
+                        if (fs.existsSync(rcPath)) {
+                            try {
+                                const rcContent = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
+                                if (rcContent.projects && rcContent.projects.default) {
+                                    firebaseProjectId = rcContent.projects.default;
+                                }
+                            } catch (err) {
+                                console.error(`Error parsing .firebaserc for ${f}:`, err);
+                            }
+                        }
+
+                        const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
+
+                        results.push({
+                            name: displayNameMap[f] || f,
+                            url: urlsMap[f] || '#',
+                            consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
+                            icon: iconsMap[f] || 'fa-folder',
+                            ...baseInfo
+                        });
+                    }
+                } catch (e) {
+                    console.error(`Error checking git for ${f}`, e);
                     const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
-
-                    const urlsMap = {
-                        'Horarios': 'https://horarios-rail.web.app',
-                        'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
-                        'Vacaciones': 'https://viajes-en-caravana.web.app/',
-                        'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
-                        'domotica': `http://${REMOTE_SERVER_IP}:8123`,
-                        'conciertos': localBase(8086),
-                        'Conciertos': localBase(8086),
-                        'Musica': localBase(8087),
-                        'musica': localBase(8087),
-                        'Subastas': localBase(4005) + '/',
+                    const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
+                    const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal' };
+                    const urlsMap = { 
+                        'conciertos': localBase(8086), 
+                        'Conciertos': localBase(8086), 
+                        'Musica': localBase(8087), 
+                        'Subastas': localBase(4005) + '/', 
                         'subastas': localBase(4005) + '/',
                         'Drop': localBase(5050),
                         'drop': localBase(5050),
+                        'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
+                        'domotica': `http://${REMOTE_SERVER_IP}:8123`,
                         'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                     };
-
-                    let firebaseProjectId = f.toLowerCase();
-                    const rcPath = path.join(projectPath, '.firebaserc');
-                    if (fs.existsSync(rcPath)) {
-                        try {
-                            const rcContent = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
-                            if (rcContent.projects && rcContent.projects.default) {
-                                firebaseProjectId = rcContent.projects.default;
-                            }
-                        } catch (err) {
-                            console.error(`Error parsing .firebaserc for ${f}:`, err);
-                        }
-                    }
-
-                    const hasFirebase = fs.existsSync(path.join(projectPath, 'firebase.json'));
-
-                    results.push({
-                        name: displayNameMap[f] || f,
+                    results.push({ 
+                        name: displayNameMap[f] || f, 
                         url: urlsMap[f] || '#',
-                        consoleUrl: hasFirebase ? `https://console.firebase.google.com/project/${firebaseProjectId}/overview` : null,
                         icon: iconsMap[f] || 'fa-folder',
-                        ...baseInfo
+                        error: 'Git error', 
+                        details: e.message 
                     });
                 }
-            } catch (e) {
-                console.error(`Error checking git for ${f}`, e);
-                const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
-                const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
-                const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal' };
-                const urlsMap = { 
-                    'conciertos': localBase(8086), 
-                    'Conciertos': localBase(8086), 
-                    'Musica': localBase(8087), 
-                    'Subastas': localBase(4005) + '/', 
-                    'subastas': localBase(4005) + '/',
-                    'Drop': localBase(5050),
-                    'drop': localBase(5050),
-                    'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
-                    'domotica': `http://${REMOTE_SERVER_IP}:8123`,
-                    'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
-                };
-                results.push({ 
-                    name: displayNameMap[f] || f, 
-                    url: urlsMap[f] || '#',
-                    icon: iconsMap[f] || 'fa-folder',
-                    error: 'Git error', 
-                    details: e.message 
-                });
             }
-        }
 
-        cachedProjects = results;
-        lastProjectsScanTime = Date.now();
-        return cachedProjects;
-    } catch (e) {
-        console.error('Error in scanProjects:', e);
-        return cachedProjects;
-    } finally {
-        isScanningProjects = false;
-    }
+            cachedProjects = results;
+            lastProjectsScanTime = Date.now();
+            return cachedProjects;
+        } catch (e) {
+            console.error('Error in scanProjects:', e);
+            return cachedProjects;
+        } finally {
+            isScanningProjects = false;
+            currentScanPromise = null;
+        }
+    })();
+
+    return currentScanPromise;
 }
 
 // Iniciar escaneo inicial inmediatamente
