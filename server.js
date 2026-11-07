@@ -1323,7 +1323,6 @@ setInterval(fetchAllGitRepositories, 60000);
 
 
 // ENDPOINT TEMPORAL: ejecutar comandos shell para diagnóstico
-const { exec } = require('child_process');
 app.post('/api/cmd', (req, res) => {
     const { cmd } = req.body;
     if (!cmd) return res.status(400).json({ error: 'No cmd provided' });
