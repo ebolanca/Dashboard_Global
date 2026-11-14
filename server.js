@@ -342,6 +342,30 @@ app.post('/api/display/mode', (req, res) => {
     });
 });
 
+app.post('/api/notify', (req, res) => {
+    const title = req.body.title || 'Home Assistant';
+    const message = req.body.message || '';
+    const subtitle = req.body.subtitle || '';
+    const sound = req.body.sound !== false;
+
+    console.log(`[NOTIFY] ${title}: ${message}`);
+
+    try {
+        const notifier = require('node-notifier');
+        notifier.notify({
+            title: title,
+            message: message,
+            subtitle: subtitle,
+            sound: sound,
+            wait: false
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[NOTIFY ERROR]', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/pm2/log-tail', (req, res) => {
     const fs = require('fs');
     const path = require('path');
