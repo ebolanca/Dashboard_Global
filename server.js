@@ -334,9 +334,9 @@ app.post('/api/maintenance/clean-c', async (req, res) => {
 
 app.post('/api/display/mode', (req, res) => {
     const mode = req.body.mode || 'internal';
-    const { exec } = require('child_process');
+    const { execFile } = require('child_process');
     console.log(`[DISPLAY] Switching display mode to /${mode}`);
-    exec(`DisplaySwitch.exe /${mode}`, (err, stdout, stderr) => {
+    execFile('C:\\Windows\\System32\\DisplaySwitch.exe', [`/${mode}`], { windowsHide: true }, (err, stdout, stderr) => {
         if (err) return res.status(500).json({ error: err.message, stderr });
         res.json({ success: true, mode });
     });
