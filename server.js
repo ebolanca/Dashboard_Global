@@ -404,13 +404,19 @@ app.post('/api/pm2/restart', (req, res) => {
                 'subastas': path.join(WORKSPACE_DIR, 'Subastas'),
                 'Subastas': path.join(WORKSPACE_DIR, 'Subastas'),
                 'drop': path.join(WORKSPACE_DIR, 'Drop'),
-                'Drop': path.join(WORKSPACE_DIR, 'Drop')
+                'Drop': path.join(WORKSPACE_DIR, 'Drop'),
+                'spam-cleaner': path.join(WORKSPACE_DIR, 'Spam_Cleaner'),
+                'Spam_Cleaner': path.join(WORKSPACE_DIR, 'Spam_Cleaner')
             };
             const targetCwd = cwdMap[processName];
-            const scriptName = (processName.toLowerCase() === 'conciertos') ? 'main.py' : 'server.js';
-            const cmd = (processName.toLowerCase() === 'conciertos')
-                ? `pm2 start main.py --name ${processName} --interpreter python`
-                : `pm2 start server.js --name ${processName}`;
+            let cmd;
+            if (processName.toLowerCase() === 'conciertos') {
+                cmd = `pm2 start main.py --name ${processName} --interpreter python`;
+            } else if (processName.toLowerCase().includes('spam')) {
+                cmd = `pm2 start index.js --name ${processName}`;
+            } else {
+                cmd = `pm2 start server.js --name ${processName}`;
+            }
 
             if (targetCwd && fs.existsSync(targetCwd)) {
                 exec(cmd, { cwd: targetCwd }, (err2, out2, errOut2) => {
@@ -608,6 +614,9 @@ async function scanProjects(force = false) {
                             'subastas': localBase(4005) + '/',
                             'Drop': localBase(5050),
                             'drop': localBase(5050),
+                            'Spam_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
+                            'spam-cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
+                            'Mail_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
                             'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                         };
 
@@ -647,6 +656,9 @@ async function scanProjects(force = false) {
                         'subastas': localBase(4005) + '/',
                         'Drop': localBase(5050),
                         'drop': localBase(5050),
+                        'Spam_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
+                        'spam-cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
+                        'Mail_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
                         'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
                         'domotica': `http://${REMOTE_SERVER_IP}:8123`,
                         'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
