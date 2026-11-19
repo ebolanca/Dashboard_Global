@@ -465,7 +465,7 @@ async function scanProjects(force = false) {
                 const projectPath = path.join(WORKSPACE_DIR, f);
                 const gitPath = path.join(projectPath, '.git');
                 
-                if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || f.toLowerCase() === 'spam_cleaner' || !fs.existsSync(gitPath)) {
+                if (f === 'vikey-proxy' || f === 'node_modules' || f === '.git' || !fs.existsSync(gitPath)) {
                     continue;
                 }
                 
