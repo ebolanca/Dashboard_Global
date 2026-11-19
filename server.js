@@ -62,7 +62,7 @@ app.get('/api/bots', (req, res) => {
                 return res.json([]);
             }
             const filtered = list
-                .filter(proc => proc.name.startsWith('whatsapp-bot-'))
+                .filter(proc => proc.name.startsWith('whatsapp-bot-') || proc.name === 'spam-cleaner' || proc.name === 'mail-cleaner')
                 .map(proc => ({
                     id: proc.pm_id,
                     name: proc.name,
@@ -566,7 +566,10 @@ async function scanProjects(force = false) {
                     } else {
                         const displayNameMap = {
                             'conciertos': 'Conciertos',
-                            'subastas': 'Subastas'
+                            'subastas': 'Subastas',
+                            'Spam_Cleaner': 'Spam Cleaner',
+                            'spam-cleaner': 'Spam Cleaner',
+                            'Mail_Cleaner': 'Spam Cleaner'
                         };
 
                         const iconsMap = {
@@ -583,7 +586,10 @@ async function scanProjects(force = false) {
                             'Subastas': 'fa-gavel',
                             'subastas': 'fa-gavel',
                             'Drop': 'fa-paperclip',
-                            'drop': 'fa-paperclip'
+                            'drop': 'fa-paperclip',
+                            'Spam_Cleaner': 'fa-broom',
+                            'spam-cleaner': 'fa-broom',
+                            'Mail_Cleaner': 'fa-broom'
                         };
                         
                         const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
@@ -631,8 +637,8 @@ async function scanProjects(force = false) {
                 } catch (e) {
                     console.error(`Error checking git for ${f}`, e);
                     const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
-                    const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas' };
-                    const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal' };
+                    const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas', 'Spam_Cleaner': 'Spam Cleaner', 'spam-cleaner': 'Spam Cleaner' };
+                    const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal', 'Spam_Cleaner': 'fa-broom', 'spam-cleaner': 'fa-broom' };
                     const urlsMap = { 
                         'conciertos': localBase(8086), 
                         'Conciertos': localBase(8086), 

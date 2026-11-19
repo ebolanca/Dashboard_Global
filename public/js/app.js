@@ -597,8 +597,8 @@ async function fetchData() {
             try {
                 const remoteRes = await fetch(`http://${config.remoteServerIp}:4000/api/bots`);
                 const remoteBots = await remoteRes.json();
-                const whatsappBots = remoteBots.filter(b => b.name.includes('whatsapp'));
-                finalBots = [...finalBots, ...whatsappBots];
+                const extraBots = remoteBots.filter(b => b.name.includes('whatsapp') || b.name.includes('spam') || b.name.includes('cleaner'));
+                finalBots = [...finalBots, ...extraBots];
             } catch (e) {
                 console.warn('No se pudieron cargar los bots remotos del OMEN', e);
             }
@@ -954,13 +954,14 @@ function renderBots(bots) {
         const isOnline = b.status === 'online';
         const statusClass = isOnline ? 'status-online' : 'status-offline';
         const isWhatsApp = b.name.includes('whatsapp');
-        const icon = isWhatsApp ? 'fa-brands fa-whatsapp' : 'fa-solid fa-robot';
-        const iconColor = isWhatsApp ? '#25D366' : 'var(--accent)';
+        const isSpam = b.name.includes('spam') || b.name.includes('cleaner') || b.name.includes('mail');
+        const icon = isWhatsApp ? 'fa-brands fa-whatsapp' : (isSpam ? 'fa-solid fa-broom' : 'fa-solid fa-robot');
+        const iconColor = isWhatsApp ? '#25D366' : (isSpam ? '#06b6d4' : 'var(--accent)');
 
         const row = document.createElement('div');
         row.className = 'row-item';
 
-        const logsBtn = isWhatsApp ? `
+        const logsBtn = (isWhatsApp || isSpam) ? `
             <button class="btn-action btn-text" onclick="window.showBotLogs('${b.name}')" title="Ver mensajes y logs">
                 <i class="fa-solid fa-terminal"></i> <span>Logs</span>
             </button>
@@ -968,7 +969,7 @@ function renderBots(bots) {
 
         row.innerHTML = `
             <!-- Columna 1: Identificador -->
-            <div class="row-identity" ${isWhatsApp ? `onclick="window.showBotLogs('${b.name}')" style="cursor: pointer;"` : ''}>
+            <div class="row-identity" ${(isWhatsApp || isSpam) ? `onclick="window.showBotLogs('${b.name}')" style="cursor: pointer;"` : ''}>
                 <div class="row-icon-box" style="border-color: ${iconColor}40">
                     <i class="${icon}" style="color: ${iconColor}"></i>
                 </div>
