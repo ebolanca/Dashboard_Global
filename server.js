@@ -1525,6 +1525,14 @@ for e in d['data']['entries']:
             old_h = e['data']['host']
             e['data']['host'] = arp_map[uid]
             updated.append({'id': e['entry_id'], 'title': e['title'], 'old': old_h, 'new': arp_map[uid]})
+    # Sincronizar Midea AC
+    elif e.get('domain') == 'midea_ac_lan':
+        raw_mac = e.get('data', {}).get('mac', '').lower()
+        m_col = ':'.join([raw_mac[i:i+2] for i in range(0, len(raw_mac), 2)])
+        if m_col in arp_map and e.get('data', {}).get('ip_address') != arp_map[m_col]:
+            old_h = e['data']['ip_address']
+            e['data']['ip_address'] = arp_map[m_col]
+            updated.append({'id': e['entry_id'], 'title': e['title'], 'old': old_h, 'new': arp_map[m_col]})
 
 if updated:
     with open(p, 'w', encoding='utf-8') as f:
