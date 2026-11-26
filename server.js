@@ -609,7 +609,8 @@ async function scanProjects(force = false) {
                         const urlsMap = {
                             'Horarios': 'https://horarios-rail.web.app',
                             'Pedidos': 'https://pedidos-rail-app-2025-87f2c.web.app/',
-                            'Vacaciones': 'https://viajes-en-caravana.web.app/',
+                            'Vacaciones': 'https://viajes.staygandia.es/',
+                            'vacaciones': 'https://viajes.staygandia.es/',
                             'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
                             'domotica': `http://${REMOTE_SERVER_IP}:8123`,
                             'conciertos': localBase(8086),
