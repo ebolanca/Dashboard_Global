@@ -406,9 +406,7 @@ app.post('/api/pm2/restart', (req, res) => {
                 'drop': path.join(WORKSPACE_DIR, 'Drop'),
                 'Drop': path.join(WORKSPACE_DIR, 'Drop'),
                 'spam-cleaner': path.join(WORKSPACE_DIR, 'Spam_Cleaner'),
-                'Spam_Cleaner': path.join(WORKSPACE_DIR, 'Spam_Cleaner'),
-                'deberes': path.join(WORKSPACE_DIR, 'Deberes'),
-                'Deberes': path.join(WORKSPACE_DIR, 'Deberes')
+                'Spam_Cleaner': path.join(WORKSPACE_DIR, 'Spam_Cleaner')
             };
             const targetCwd = cwdMap[processName];
             let cmd;
@@ -577,9 +575,7 @@ async function scanProjects(force = false) {
                             'subastas': 'Subastas',
                             'Spam_Cleaner': 'Spam Cleaner',
                             'spam-cleaner': 'Spam Cleaner',
-                            'Mail_Cleaner': 'Spam Cleaner',
-                            'Deberes': 'Deberes',
-                            'deberes': 'Deberes'
+                            'Mail_Cleaner': 'Spam Cleaner'
                         };
 
                         const iconsMap = {
@@ -599,9 +595,7 @@ async function scanProjects(force = false) {
                             'drop': 'fa-paperclip',
                             'Spam_Cleaner': 'fa-broom',
                             'spam-cleaner': 'fa-broom',
-                            'Mail_Cleaner': 'fa-broom',
-                            'Deberes': 'fa-graduation-cap',
-                            'deberes': 'fa-graduation-cap'
+                            'Mail_Cleaner': 'fa-broom'
                         };
                         
                         const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
@@ -624,9 +618,7 @@ async function scanProjects(force = false) {
                             'Spam_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
                             'spam-cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
                             'Mail_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
-                            'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`,
-                            'Deberes': localBase(8089),
-                            'deberes': localBase(8089)
+                            'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                         };
 
                         let firebaseProjectId = f.toLowerCase();
@@ -655,8 +647,8 @@ async function scanProjects(force = false) {
                 } catch (e) {
                     console.error(`Error checking git for ${f}`, e);
                     const localBase = (port) => `http://${REMOTE_SERVER_IP}:${port}`;
-                    const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas', 'Spam_Cleaner': 'Spam Cleaner', 'spam-cleaner': 'Spam Cleaner', 'Deberes': 'Deberes', 'deberes': 'Deberes' };
-                    const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal', 'Spam_Cleaner': 'fa-broom', 'spam-cleaner': 'fa-broom', 'Deberes': 'fa-graduation-cap', 'deberes': 'fa-graduation-cap' };
+                    const displayNameMap = { 'conciertos': 'Conciertos', 'subastas': 'Subastas', 'Spam_Cleaner': 'Spam Cleaner', 'spam-cleaner': 'Spam Cleaner' };
+                    const iconsMap = { 'conciertos': 'fa-guitar', 'Conciertos': 'fa-guitar', 'Musica': 'fa-music', 'Subastas': 'fa-gavel', 'subastas': 'fa-gavel', 'Drop': 'fa-paperclip', 'drop': 'fa-paperclip', 'Domotica': 'fa-house-signal', 'Spam_Cleaner': 'fa-broom', 'spam-cleaner': 'fa-broom' };
                     const urlsMap = { 
                         'conciertos': localBase(8086), 
                         'Conciertos': localBase(8086), 
@@ -670,9 +662,7 @@ async function scanProjects(force = false) {
                         'Mail_Cleaner': IS_MSI ? 'http://localhost:4007' : localBase(4007),
                         'Domotica': `http://${REMOTE_SERVER_IP}:8123`,
                         'domotica': `http://${REMOTE_SERVER_IP}:8123`,
-                        'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`,
-                        'Deberes': localBase(8089),
-                        'deberes': localBase(8089)
+                        'Dashboard_Global': `http://${REMOTE_SERVER_IP}:4000`
                     };
                     results.push({ 
                         name: displayNameMap[f] || f, 

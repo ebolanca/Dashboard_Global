@@ -21,9 +21,7 @@ const iconsMap = {
     'Subastas': 'fa-gavel',
     'subastas': 'fa-gavel',
     'Drop': 'fa-paperclip',
-    'drop': 'fa-paperclip',
-    'Deberes': 'fa-graduation-cap',
-    'deberes': 'fa-graduation-cap'
+    'drop': 'fa-paperclip'
 };
 
 function formatUptime(uptime) {
